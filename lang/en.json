@@ -1,0 +1,22 @@
+{
+    "AIProviders": {
+        "ApiKey": "API key",
+        "ApiKeyAlreadyConfigured": "An API key is already configured. Leave this field empty to keep it.",
+        "ApiKeyHelp": "Stored API keys are masked and are only available to server-side AI provider services.",
+        "ClaudeDescription": "Anthropic Claude models.",
+        "CloudConfigurationHelp": "Provider connections are managed by Matomo Cloud. You can only change the default provider.",
+        "CustomProviderDescription": "Self-hosted or custom AI provider connection.",
+        "DefaultCapabilityLevel": "Default model capability level",
+        "DefaultProvider": "Default provider",
+        "EndpointUrl": "Endpoint URL",
+        "EndpointUrlHelp": "Use this for a self-hosted or custom provider endpoint.",
+        "GeminiDescription": "Google Gemini models.",
+        "InstantCapability": "Instant",
+        "MenuTitle": "AI Providers",
+        "OpenAIDescription": "OpenAI models.",
+        "PluginDescription": "Configure AI provider connections and default model settings used by Matomo AI features.",
+        "ProviderConnections": "Provider connections",
+        "SettingsSaveSuccess": "AI provider settings saved.",
+        "ThinkingCapability": "Thinking"
+    }
+}
