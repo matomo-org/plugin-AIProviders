@@ -19,11 +19,14 @@ declare(strict_types=1);
 namespace Piwik\Plugins\AIProviders;
 
 use Piwik\Piwik;
-use Piwik\Plugin\Controller as PluginController;
+use Piwik\Plugin\ControllerAdmin;
 
-class Controller extends PluginController
+class Controller extends ControllerAdmin
 {
-    public function index()
+    /**
+     * @throws \Exception
+     */
+    public function index(): string
     {
         Piwik::checkUserHasSuperUserAccess();
 

@@ -3,7 +3,7 @@
 /**
  * Copyright (C) InnoCraft Ltd - All rights reserved.
  *
- * NOTICE:  All information contained herein is, and remains the property of InnoCraft Ltd.
+ * NOTICE: All information contained herein is, and remains the property of InnoCraft Ltd.
  * The intellectual and technical concepts contained herein are protected by trade secret or copyright law.
  * Redistribution of this information or reproduction of this material is strictly forbidden
  * unless prior written permission is obtained from InnoCraft Ltd.
@@ -34,9 +34,9 @@ class AIProviders extends Plugin
     public function addAIProviders(AIProvidersList $providers): void
     {
         $providers->addProvider(new Provider\Claude());
-        $providers->addProvider(new Provider\CustomProvider());
         $providers->addProvider(new Provider\Gemini());
         $providers->addProvider(new Provider\OpenAI());
+        $providers->addProvider(new Provider\CustomProvider());
     }
 
     /**
@@ -82,22 +82,35 @@ class AIProviders extends Plugin
     public function getClientSideTranslationKeys(array &$translations): void
     {
         $translations[] = 'AIProviders_ApiKey';
-        $translations[] = 'AIProviders_ApiKeyAlreadyConfigured';
-        $translations[] = 'AIProviders_ApiKeyHelp';
+        $translations[] = 'AIProviders_ApiKeyAlreadyConfiguredPlaceholder';
+        $translations[] = 'AIProviders_ApiKeyPlaceholder';
         $translations[] = 'AIProviders_ClaudeDescription';
         $translations[] = 'AIProviders_CloudConfigurationHelp';
+        $translations[] = 'AIProviders_ConfigurationIntro';
         $translations[] = 'AIProviders_CustomProviderDescription';
         $translations[] = 'AIProviders_DefaultCapabilityLevel';
+        $translations[] = 'AIProviders_DefaultCapabilityLevelHelp';
         $translations[] = 'AIProviders_DefaultProvider';
+        $translations[] = 'AIProviders_DefaultProviderHelp';
+        $translations[] = 'AIProviders_DefaultsTitle';
+        $translations[] = 'AIProviders_Disconnect';
+        $translations[] = 'AIProviders_DisconnectNotAvailable';
         $translations[] = 'AIProviders_EndpointUrl';
-        $translations[] = 'AIProviders_EndpointUrlHelp';
+        $translations[] = 'AIProviders_EndpointUrlPlaceholder';
         $translations[] = 'AIProviders_GeminiDescription';
-        $translations[] = 'General_LoadingData';
         $translations[] = 'AIProviders_InstantCapability';
+        $translations[] = 'AIProviders_InstantCapabilityDescription';
         $translations[] = 'AIProviders_MenuTitle';
         $translations[] = 'AIProviders_OpenAIDescription';
-        $translations[] = 'AIProviders_ProviderConnections';
+        $translations[] = 'AIProviders_SelectedConfiguration';
         $translations[] = 'AIProviders_SettingsSaveSuccess';
+        $translations[] = 'AIProviders_StatusConnected';
+        $translations[] = 'AIProviders_StatusNotConnected';
+        $translations[] = 'AIProviders_TestConnection';
+        $translations[] = 'AIProviders_TestConnectionNotAvailable';
         $translations[] = 'AIProviders_ThinkingCapability';
+        $translations[] = 'AIProviders_ThinkingCapabilityDescription';
+        $translations[] = 'General_Cancel';
+        $translations[] = 'General_LoadingData';
     }
 }

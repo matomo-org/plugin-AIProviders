@@ -3,7 +3,7 @@
 /**
  * Copyright (C) InnoCraft Ltd - All rights reserved.
  *
- * NOTICE:  All information contained herein is, and remains the property of InnoCraft Ltd.
+ * NOTICE: All information contained herein is, and remains the property of InnoCraft Ltd.
  * The intellectual and technical concepts contained herein are protected by trade secret or copyright law.
  * Redistribution of this information or reproduction of this material is strictly forbidden
  * unless prior written permission is obtained from InnoCraft Ltd.
@@ -111,13 +111,19 @@ class Configuration
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, array{label: string, description: string}>
      */
     public function getCapabilityLevels(): array
     {
         return [
-            self::CAPABILITY_INSTANT => 'AIProviders_InstantCapability',
-            self::CAPABILITY_THINKING => 'AIProviders_ThinkingCapability',
+            self::CAPABILITY_INSTANT => [
+                'label' => 'AIProviders_InstantCapability',
+                'description' => 'AIProviders_InstantCapabilityDescription',
+            ],
+            self::CAPABILITY_THINKING => [
+                'label' => 'AIProviders_ThinkingCapability',
+                'description' => 'AIProviders_ThinkingCapabilityDescription',
+            ],
         ];
     }
 

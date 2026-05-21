@@ -4,6 +4,12 @@ Configure AI provider connections and default model settings used by Matomo AI f
 
 Built-in providers: Claude, OpenAI, Gemini, and a generic custom provider for OpenAI-compatible endpoints.
 
+## Configuration
+
+Settings are managed from **Administration > System > AI Providers**.
+
+The plugin stores the default provider, default capability level, and provider connection settings in Matomo options. API keys are only returned to the administration UI as masked state, not as secret values.
+
 ## Usage from other plugins
 
 Do not call this plugin's `API.php` from other plugins. Its public API methods exist only for the administration UI and only expose masked configuration values — adding prompt/completion methods there would expose them over Matomo's HTTP API to anyone with a valid token.

@@ -20,25 +20,11 @@ namespace Piwik\Plugins\AIProviders\Provider;
 
 abstract class AIProvider
 {
-    /**
-     * @var string
-     */
-    private $id;
-
-    /**
-     * @var string
-     */
-    private $name;
-
-    /**
-     * @var string
-     */
-    private $description;
-
-    /**
-     * @var bool
-     */
-    private $supportsCustomEndpoint;
+    // TODO: check if this is supported, because typed properties are only available above PHP 7.4
+    private string $id;
+    private string $name;
+    private string $description;
+    private bool $supportsCustomEndpoint;
 
     public function __construct(
         string $id,
