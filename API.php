@@ -19,9 +19,11 @@ declare(strict_types=1);
 namespace Piwik\Plugins\AIProviders;
 
 use Piwik\Container\StaticContainer;
+use Piwik\Common;
 use Piwik\Piwik;
 use Piwik\Plugin\API as PluginAPI;
 use Piwik\Plugins\AIProviders\Model\Configuration;
+use Piwik\Plugins\AIProviders\Provider\AIProvider;
 
 /**
  * Exposes AI provider configuration methods for the Matomo administration UI.
@@ -47,13 +49,14 @@ class API extends PluginAPI
     /**
      * Saves AI provider settings from the administration UI.
      *
-     * API keys are accepted only as POST data and are never returned by this API.
-     * On Matomo Cloud, provider credentials and capability level are ignored so
-     * only the default provider can be changed.
+     * API keys should be submitted as POST data and are never returned by this
+     * API. On Matomo Cloud, provider credentials and capability level are
+     * ignored so only the default provider can be changed.
      *
      * @param string $defaultProviderId Provider ID to use by default.
      * @param string $defaultCapabilityLevel Default model capability level.
-     * @param string $providerConfigurations JSON object keyed by provider ID with connection settings.
+     * @param string $providerConfigurations JSON object keyed by provider ID
+     *                                      with connection settings.
      * @return array<string, mixed> Updated provider metadata and masked configuration values.
      */
     public function saveSettings(
@@ -76,8 +79,88 @@ class API extends PluginAPI
         return $configuration->getSettings($providers);
     }
 
+    /**
+     * Tests one provider using the submitted connection settings.
+     *
+     * @param string $providerId Provider ID to test.
+     * @param string $providerConfiguration JSON object with unsaved apiKey
+     *                                      and endpointUrl values.
+     * @return array<string, string> Provider response metadata and completion text.
+     */
+    public function testConnection(
+        string $providerId,
+        #[\SensitiveParameter]
+        string $providerConfiguration = '{}'
+    ): array {
+        Piwik::checkUserHasSuperUserAccess();
+
+        $providers = AIProviders::getAvailableProviders();
+        $provider = $this->getProvider($providers->getProvider($providerId), $providerId);
+        $configuration = $this->getConfiguration()->getProviderConfigurationForUse(
+            $provider,
+            $this->decodeProviderConfiguration($providerConfiguration)
+        );
+
+        return $this->getAIProviderService()
+            ->completePromptWithProvider(
+                $provider,
+                $configuration,
+                'why is the sky blue, answer in 7 words'
+            )
+            ->toArray();
+    }
+
+    /**
+     * Removes a stored provider connection.
+     *
+     * @param string $providerId Provider ID to disconnect.
+     * @return array<string, mixed> Updated provider metadata and masked configuration values.
+     */
+    public function disconnectProvider(string $providerId): array
+    {
+        Piwik::checkUserHasSuperUserAccess();
+
+        $providers = AIProviders::getAvailableProviders();
+        $this->getProvider($providers->getProvider($providerId), $providerId);
+
+        $configuration = $this->getConfiguration();
+        $configuration->removeProviderConfiguration($providerId);
+
+        return $configuration->getSettings($providers);
+    }
+
     private function getConfiguration(): Configuration
     {
         return StaticContainer::get(Configuration::class);
+    }
+
+    private function getAIProviderService(): AIProviderService
+    {
+        return StaticContainer::get(AIProviderService::class);
+    }
+
+    private function getProvider(?AIProvider $provider, string $providerId): AIProvider
+    {
+        if ($provider === null) {
+            throw new \InvalidArgumentException(sprintf('Unknown AI provider "%s".', $providerId));
+        }
+
+        return $provider;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function decodeProviderConfiguration(
+        #[\SensitiveParameter]
+        string $providerConfigurationJson
+    ): array {
+        $decoded = json_decode(Common::unsanitizeInputValue($providerConfigurationJson), true);
+
+        if (!is_array($decoded)) {
+            throw new \InvalidArgumentException('Provider configuration must be a JSON object.');
+        }
+
+        return $decoded;
     }
 }

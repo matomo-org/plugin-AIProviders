@@ -20,8 +20,48 @@ namespace Piwik\Plugins\AIProviders\Provider;
 
 class Claude extends AIProvider
 {
+    private const DEFAULT_MODEL = 'claude-haiku-4-5';
+
     public function __construct()
     {
         parent::__construct('claude', 'Claude', 'AIProviders_ClaudeDescription');
+    }
+
+    public function getDefaultEndpointUrl(): string
+    {
+        return 'https://api.anthropic.com/v1/messages';
+    }
+
+    public function getDefaultModel(): string
+    {
+        return self::DEFAULT_MODEL;
+    }
+
+    /**
+     * @param array<string, string> $configuration
+     */
+    public function completePrompt(array $configuration, string $prompt): string
+    {
+        $response = $this->sendJsonRequest(
+            $this->getEndpointUrl($configuration),
+            [
+                'anthropic-version' => '2023-06-01',
+                'x-api-key' => $this->getApiKey($configuration),
+            ],
+            [
+                'model' => $this->getDefaultModel(),
+                'max_tokens' => 80,
+                'messages' => [
+                    [
+                        'role' => 'user',
+                        'content' => $prompt,
+                    ],
+                ],
+            ]
+        );
+
+        $text = $response['content'][0]['text'] ?? '';
+
+        return is_string($text) ? trim($text) : '';
     }
 }

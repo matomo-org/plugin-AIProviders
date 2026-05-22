@@ -25,7 +25,12 @@ import {
 } from 'CoreHome';
 import { Form as vForm, SaveButton } from 'CorePluginsAdmin';
 import ProviderCard from './components/ProviderCard.vue';
-import type { CapabilityLevelOption, ProviderConfiguration, Settings } from './types';
+import type {
+  AIProviderResponse,
+  CapabilityLevelOption,
+  ProviderConfiguration,
+  Settings,
+} from './types';
 
 const settings = ref<Settings | null>(null);
 const isLoading = ref(false);
@@ -33,8 +38,13 @@ const isSaving = ref(false);
 const defaultProviderId = ref('');
 const defaultCapabilityLevel = ref('');
 const providerConfigurations = ref<Record<string, ProviderConfiguration>>({});
+const testingProviders = ref<Record<string, boolean>>({});
+const disconnectingProviders = ref<Record<string, boolean>>({});
 
 const providers = computed(() => settings.value?.providers || []);
+const hasUsableProvider = computed(() => providers.value.some(
+  (provider) => provider.configuration.isUsable,
+));
 const canEditCapabilityLevel = computed(() => !!settings.value?.canEditCapabilityLevel);
 const canEditProviderConfiguration = computed(() => !!settings.value?.canEditProviderConfiguration);
 const selectedProvider = computed(() => providers.value.find((provider) => (
@@ -84,14 +94,67 @@ function applySettings(nextSettings: Settings) {
   providerConfigurations.value = nextProviderConfigurations;
 }
 
+function markProviderUsable(providerId: string) {
+  if (!settings.value) {
+    return;
+  }
+
+  const provider = settings.value.providers.find((p) => p.id === providerId);
+  if (provider) {
+    provider.configuration = {
+      ...provider.configuration,
+      hasApiKey: true,
+      isUsable: true,
+    };
+  }
+
+  if (!defaultProviderId.value) {
+    defaultProviderId.value = providerId;
+  }
+}
+
+function getCleanErrorMessage(error: unknown) {
+  let message = '';
+
+  if (error && typeof error === 'object' && 'message' in error) {
+    message = `${(error as { message: string }).message}`;
+  } else {
+    message = `${error}`;
+  }
+
+  return message
+    .replace(/\s*#\d+\s+[\s\S]*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function showErrorNotification(error: unknown, id: string) {
+  const cleaned = getCleanErrorMessage(error);
+  const isUseful = cleaned && cleaned !== 'Something went wrong';
+  const message = isUseful
+    ? translate('AIProviders_RequestFailed', cleaned)
+    : translate('AIProviders_UnexpectedError');
+
+  return NotificationsStore.show({
+    message,
+    type: 'transient',
+    id,
+    context: 'error',
+  });
+}
+
 async function loadSettings() {
   isLoading.value = true;
 
   try {
     const response = await AjaxHelper.fetch<Settings>({
       method: 'AIProviders.getSettings',
+    }, {
+      createErrorNotification: false,
     });
     applySettings(response);
+  } catch (error) {
+    showErrorNotification(error, 'aiProvidersLoadError');
   } finally {
     isLoading.value = false;
   }
@@ -111,29 +174,72 @@ function updateEndpointUrl(providerId: string, endpointUrl: string) {
   };
 }
 
-function disconnectProvider(providerId: string) {
-  // PoC: clears the locally entered key. Removing a persisted key requires a
-  // backend method that isn't wired up yet.
-  providerConfigurations.value[providerId] = {
-    ...providerConfigurations.value[providerId],
-    apiKey: '',
-  };
-  NotificationsStore.show({
-    message: translate('AIProviders_DisconnectNotAvailable'),
-    type: 'transient',
-    id: `aiProvidersDisconnect-${providerId}`,
-    context: 'info',
-  });
+async function disconnectProvider(providerId: string) {
+  disconnectingProviders.value[providerId] = true;
+
+  try {
+    const response = await AjaxHelper.post<Settings>(
+      {
+        method: 'AIProviders.disconnectProvider',
+      },
+      {
+        providerId,
+      },
+      {
+        withTokenInUrl: true,
+        createErrorNotification: false,
+      },
+    );
+    applySettings(response);
+
+    NotificationsStore.show({
+      message: translate('AIProviders_DisconnectSuccess'),
+      type: 'transient',
+      id: `aiProvidersDisconnect-${providerId}`,
+      context: 'success',
+    });
+  } catch (error) {
+    showErrorNotification(error, `aiProvidersDisconnectError-${providerId}`);
+  } finally {
+    disconnectingProviders.value[providerId] = false;
+  }
 }
 
-function testConnection(providerId: string) {
-  // PoC: placeholder until a server-side connection test endpoint exists.
-  NotificationsStore.show({
-    message: translate('AIProviders_TestConnectionNotAvailable'),
-    type: 'transient',
-    id: `aiProvidersTest-${providerId}`,
-    context: 'info',
-  });
+async function testConnection(providerId: string) {
+  testingProviders.value[providerId] = true;
+
+  try {
+    const response = await AjaxHelper.post<AIProviderResponse>(
+      {
+        method: 'AIProviders.testConnection',
+      },
+      {
+        providerId,
+        providerConfiguration: JSON.stringify(providerConfigurations.value[providerId] || {}),
+      },
+      {
+        withTokenInUrl: true,
+        createErrorNotification: false,
+      },
+    );
+
+    markProviderUsable(providerId);
+
+    NotificationsStore.show({
+      message: translate(
+        'AIProviders_TestConnectionSuccess',
+        response.providerName,
+        response.text,
+      ),
+      type: 'transient',
+      id: `aiProvidersTest-${providerId}`,
+      context: 'success',
+    });
+  } catch (error) {
+    showErrorNotification(error, `aiProvidersTestError-${providerId}`);
+  } finally {
+    testingProviders.value[providerId] = false;
+  }
 }
 
 function cancelChanges() {
@@ -160,6 +266,7 @@ async function saveSettings() {
       },
       {
         withTokenInUrl: true,
+        createErrorNotification: false,
       },
     );
     applySettings(response);
@@ -170,6 +277,9 @@ async function saveSettings() {
       id: 'aiProvidersSettings',
       context: 'success',
     });
+    NotificationsStore.scrollToNotification(notificationInstanceId);
+  } catch (error) {
+    const notificationInstanceId = showErrorNotification(error, 'aiProvidersSettingsError');
     NotificationsStore.scrollToNotification(notificationInstanceId);
   } finally {
     isSaving.value = false;
@@ -230,15 +340,26 @@ onMounted(loadSettings);
               :key="provider.id"
               :can-edit="canEditProviderConfiguration"
               :configuration="providerConfigurations[provider.id]"
+              :is-disconnecting="!!disconnectingProviders[provider.id]"
+              :is-testing="!!testingProviders[provider.id]"
               :provider="provider"
               :selected="defaultProviderId === provider.id"
+              :usable-as-default="provider.configuration.isUsable"
               @disconnect="disconnectProvider(provider.id)"
-              @select="defaultProviderId = provider.id"
+              @select="provider.configuration.isUsable ? defaultProviderId = provider.id : null"
               @test="testConnection(provider.id)"
               @update:api-key="updateApiKey(provider.id, $event)"
               @update:endpoint-url="updateEndpointUrl(provider.id, $event)"
             />
           </div>
+
+          <Alert
+            v-if="!hasUsableProvider"
+            class="ai-providers-default-warning"
+            severity="warning"
+          >
+            {{ translate('AIProviders_NoDefaultProviderWarning') }}
+          </Alert>
         </section>
 
         <section
@@ -280,10 +401,6 @@ onMounted(loadSettings);
               </div>
             </label>
           </div>
-
-          <p class="ai-providers-capability-footnote">
-
-          </p>
         </section>
       </div>
     </ContentBlock>
@@ -367,7 +484,7 @@ onMounted(loadSettings);
 .ai-providers-section + .ai-providers-section {
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid var(--ai-providers-border);
+  border-top: 1px solid #ccc;
 }
 
 .ai-providers-section-help {
@@ -380,6 +497,15 @@ onMounted(loadSettings);
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 16px;
+}
+
+.ai-providers-cards {
+  padding-top: 24px;
+  margin-top: 32px;
+}
+
+.ai-providers-default-warning {
+  margin-top: 16px;
 }
 
 .ai-providers-capability-card {
@@ -413,8 +539,7 @@ onMounted(loadSettings);
   font-size: 15px;
 }
 
-.ai-providers-capability-description,
-.ai-providers-capability-footnote {
+.ai-providers-capability-description {
   color: var(--ai-providers-text-muted);
   font-size: 13px;
   line-height: 1.5;

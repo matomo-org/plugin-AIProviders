@@ -20,8 +20,48 @@ namespace Piwik\Plugins\AIProviders\Provider;
 
 class OpenAI extends AIProvider
 {
+    private const DEFAULT_MODEL = 'gpt-4.1-mini';
+
     public function __construct()
     {
         parent::__construct('openai', 'OpenAI', 'AIProviders_OpenAIDescription');
+    }
+
+    public function getDefaultEndpointUrl(): string
+    {
+        return 'https://api.openai.com/v1/chat/completions';
+    }
+
+    public function getDefaultModel(): string
+    {
+        return self::DEFAULT_MODEL;
+    }
+
+    /**
+     * @param array<string, string> $configuration
+     */
+    public function completePrompt(array $configuration, string $prompt): string
+    {
+        $response = $this->sendJsonRequest(
+            $this->getEndpointUrl($configuration),
+            [
+                'Authorization' => 'Bearer ' . $this->getApiKey($configuration),
+            ],
+            [
+                'model' => $this->getDefaultModel(),
+                'messages' => [
+                    [
+                        'role' => 'user',
+                        'content' => $prompt,
+                    ],
+                ],
+                'max_tokens' => 80,
+                'temperature' => 0.2,
+            ]
+        );
+
+        $text = $response['choices'][0]['message']['content'] ?? '';
+
+        return is_string($text) ? trim($text) : '';
     }
 }

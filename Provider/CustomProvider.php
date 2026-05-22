@@ -20,6 +20,8 @@ namespace Piwik\Plugins\AIProviders\Provider;
 
 class CustomProvider extends AIProvider
 {
+    private const DEFAULT_MODEL = 'gpt-4.1-mini';
+
     public function __construct()
     {
         parent::__construct(
@@ -28,5 +30,49 @@ class CustomProvider extends AIProvider
             'AIProviders_CustomProviderDescription',
             true
         );
+    }
+
+    public function getDefaultModel(): string
+    {
+        return self::DEFAULT_MODEL;
+    }
+
+    /**
+     * @param array<string, string> $configuration
+     */
+    public function completePrompt(array $configuration, string $prompt): string
+    {
+        // TODO: Add a configurable model name for non-OpenAI compatible servers
+        // that do not expose an OpenAI model alias.
+        $response = $this->sendJsonRequest(
+            $this->getChatCompletionsEndpoint($this->getEndpointUrl($configuration)),
+            [
+                'Authorization' => 'Bearer ' . $this->getApiKey($configuration),
+            ],
+            [
+                'model' => $this->getDefaultModel(),
+                'messages' => [
+                    [
+                        'role' => 'user',
+                        'content' => $prompt,
+                    ],
+                ],
+                'max_tokens' => 80,
+                'temperature' => 0.2,
+            ]
+        );
+
+        $text = $response['choices'][0]['message']['content'] ?? '';
+
+        return is_string($text) ? trim($text) : '';
+    }
+
+    private function getChatCompletionsEndpoint(string $endpointUrl): string
+    {
+        if (preg_match('#/chat/completions/?$#', $endpointUrl)) {
+            return $endpointUrl;
+        }
+
+        return rtrim($endpointUrl, '/') . '/chat/completions';
     }
 }

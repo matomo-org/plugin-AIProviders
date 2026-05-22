@@ -23,9 +23,11 @@ export interface Provider {
   name: string;
   description: string;
   supportsCustomEndpoint: boolean;
+  defaultModel: string;
   configuration: {
     hasApiKey: boolean;
     endpointUrl: string;
+    isUsable: boolean;
   };
 }
 
@@ -47,4 +49,11 @@ export interface CapabilityLevelOption {
   id: string;
   label: string;
   description: string;
+}
+
+export interface AIProviderResponse {
+  providerId: string;
+  providerName: string;
+  model: string;
+  text: string;
 }

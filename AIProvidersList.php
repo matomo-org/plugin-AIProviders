@@ -48,7 +48,7 @@ class AIProvidersList
     }
 
     /**
-     * @return AIProvider[]
+     * @return array<int, AIProvider>
      */
     public function getProviders(): array
     {

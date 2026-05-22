@@ -23,9 +23,6 @@ use Piwik\Plugin\ControllerAdmin;
 
 class Controller extends ControllerAdmin
 {
-    /**
-     * @throws \Exception
-     */
     public function index(): string
     {
         Piwik::checkUserHasSuperUserAccess();

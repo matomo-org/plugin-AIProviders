@@ -19,7 +19,9 @@ declare(strict_types=1);
 namespace Piwik\Plugins\AIProviders\tests\Integration;
 
 use Piwik\Container\StaticContainer;
+use Piwik\Common;
 use Piwik\Option;
+use Piwik\Piwik;
 use Piwik\Plugins\AIProviders\API;
 use Piwik\Plugins\AIProviders\AIProviderService;
 use Piwik\Plugins\AIProviders\Model\Configuration;
@@ -57,7 +59,7 @@ class ConfigurationTest extends IntegrationTestCase
     {
         $settings = $this->api->getSettings();
 
-        $this->assertSame('openai', $settings['defaultProviderId']);
+        $this->assertSame('', $settings['defaultProviderId']);
         $this->assertSame(Configuration::CAPABILITY_INSTANT, $settings['defaultCapabilityLevel']);
         $this->assertTrue($settings['canEditProviderConfiguration']);
         $this->assertTrue($settings['canEditCapabilityLevel']);
@@ -86,8 +88,26 @@ class ConfigurationTest extends IntegrationTestCase
 
         $claude = $this->getProvider($settings, 'claude');
         $this->assertTrue($claude['configuration']['hasApiKey']);
+        $this->assertTrue($claude['configuration']['isUsable']);
         $this->assertArrayNotHasKey('apiKey', $claude['configuration']);
         $this->assertStringNotContainsString('secret-claude-key', (string) json_encode($settings));
+    }
+
+    public function testSaveSettingsAcceptsSanitizedJsonFromApiRequests(): void
+    {
+        $settings = $this->api->saveSettings(
+            'claude',
+            Configuration::CAPABILITY_THINKING,
+            Common::sanitizeInputValue((string) json_encode([
+                'claude' => [
+                    'apiKey' => 'secret-claude-key',
+                    'endpointUrl' => '',
+                ],
+            ]))
+        );
+
+        $claude = $this->getProvider($settings, 'claude');
+        $this->assertTrue($claude['configuration']['hasApiKey']);
     }
 
     public function testSaveSettingsPreservesExistingApiKeyWhenInputIsEmpty(): void
@@ -104,7 +124,7 @@ class ConfigurationTest extends IntegrationTestCase
         );
 
         $settings = $this->api->saveSettings(
-            'openai',
+            'claude',
             Configuration::CAPABILITY_INSTANT,
             (string) json_encode([
                 'claude' => [
@@ -136,6 +156,136 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertSame('claude', $service->getDefaultProvider()->getId());
         $this->assertSame(Configuration::CAPABILITY_THINKING, $service->getDefaultCapabilityLevel());
         $this->assertSame('secret-claude-key', $service->getDefaultProviderConfiguration()['apiKey']);
+    }
+
+    public function testServiceCompletesPromptUsingConfiguredDefaultProvider(): void
+    {
+        $this->api->saveSettings(
+            'openai',
+            Configuration::CAPABILITY_INSTANT,
+            (string) json_encode([
+                'openai' => [
+                    'apiKey' => 'secret-openai-key',
+                    'endpointUrl' => '',
+                ],
+            ])
+        );
+        $this->mockAIProviderResponse('Because molecules scatter blue light more strongly.');
+
+        $response = StaticContainer::get(AIProviderService::class)
+            ->completePrompt('why is the sky blue, answer in 7 words');
+
+        $this->assertSame('openai', $response->toArray()['providerId']);
+        $this->assertSame('Because molecules scatter blue light more strongly.', $response->getText());
+    }
+
+    public function testApiTestsConnectionWithUnsavedProviderConfiguration(): void
+    {
+        $this->mockAIProviderResponse('Because molecules scatter blue light more strongly.');
+
+        $response = $this->api->testConnection(
+            'openai',
+            Common::sanitizeInputValue((string) json_encode([
+                'apiKey' => 'secret-openai-key',
+                'endpointUrl' => '',
+            ]))
+        );
+
+        $this->assertSame('openai', $response['providerId']);
+        $this->assertSame('Because molecules scatter blue light more strongly.', $response['text']);
+    }
+
+    public function testApiRetriesTransientProviderErrors(): void
+    {
+        $requests = 0;
+        Piwik::addAction('Http.sendHttpRequest', function (
+            string $url,
+            array $httpEventParams,
+            ?string &$response,
+            ?int &$status,
+            array &$headers
+        ) use (&$requests): void {
+            $this->assertSame(
+                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+                $url
+            );
+            $this->assertSame('POST', $httpEventParams['httpMethod']);
+
+            $requests++;
+
+            if ($requests === 1) {
+                $response = (string) json_encode([
+                    'error' => [
+                        'code' => 503,
+                        'message' => 'This model is currently experiencing high demand.',
+                        'status' => 'UNAVAILABLE',
+                    ],
+                ]);
+                $status = 503;
+                $headers = ['Content-Type' => 'application/json'];
+                return;
+            }
+
+            $response = (string) json_encode([
+                'candidates' => [
+                    [
+                        'content' => [
+                            'parts' => [
+                                [
+                                    'text' => 'Because molecules scatter blue light more strongly.',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ]);
+            $status = 200;
+            $headers = ['Content-Type' => 'application/json'];
+        });
+
+        $response = $this->api->testConnection(
+            'gemini',
+            Common::sanitizeInputValue((string) json_encode([
+                'apiKey' => 'secret-gemini-key',
+                'endpointUrl' => '',
+            ]))
+        );
+
+        $this->assertSame(2, $requests);
+        $this->assertSame('gemini', $response['providerId']);
+        $this->assertSame('Because molecules scatter blue light more strongly.', $response['text']);
+    }
+
+    public function testDisconnectProviderRemovesStoredApiKey(): void
+    {
+        $this->api->saveSettings(
+            'openai',
+            Configuration::CAPABILITY_INSTANT,
+            (string) json_encode([
+                'openai' => [
+                    'apiKey' => 'secret-openai-key',
+                    'endpointUrl' => '',
+                ],
+            ])
+        );
+
+        $settings = $this->api->disconnectProvider('openai');
+        $openAI = $this->getProvider($settings, 'openai');
+
+        $this->assertSame('', $settings['defaultProviderId']);
+        $this->assertFalse($openAI['configuration']['hasApiKey']);
+    }
+
+    public function testSaveSettingsRejectsUnconfiguredDefaultProvider(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('AI provider "openai" is not configured.');
+
+        $this->api->saveSettings(
+            'openai',
+            Configuration::CAPABILITY_INSTANT,
+            '{}'
+        );
     }
 
     public function testSaveSettingsRejectsUnknownProvider(): void
@@ -183,6 +333,32 @@ class ConfigurationTest extends IntegrationTestCase
     {
         FakeAccess::clearAccess();
         FakeAccess::$identity = 'anonymous';
+    }
+
+    private function mockAIProviderResponse(string $text): void
+    {
+        Piwik::addAction('Http.sendHttpRequest', function (
+            string $url,
+            array $httpEventParams,
+            ?string &$response,
+            ?int &$status,
+            array &$headers
+        ) use ($text): void {
+            $this->assertSame('https://api.openai.com/v1/chat/completions', $url);
+            $this->assertSame('POST', $httpEventParams['httpMethod']);
+
+            $response = (string) json_encode([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => $text,
+                        ],
+                    ],
+                ],
+            ]);
+            $status = 200;
+            $headers = ['Content-Type' => 'application/json'];
+        });
     }
 
     public function provideContainerConfig(): array

@@ -35,7 +35,7 @@ class AIProviderService
     }
 
     /**
-     * Returns the configured default provider for server-side plugin use.
+     * Returns the configured default provider for trusted PHP callers.
      */
     public function getDefaultProvider(): AIProvider
     {
@@ -71,5 +71,84 @@ class AIProviderService
     public function getDefaultCapabilityLevel(): string
     {
         return $this->configuration->getDefaultCapabilityLevel();
+    }
+
+    /**
+     * Returns provider status metadata for trusted PHP callers.
+     *
+     * @return array<int, array{
+     *     id: string,
+     *     name: string,
+     *     description: string,
+     *     defaultModel: string,
+     *     isDefault: bool,
+     *     isConfigured: bool,
+     *     supportsCustomEndpoint: bool,
+     *     endpointUrl: string
+     * }>
+     */
+    public function getAvailableProviderStatuses(): array
+    {
+        $providers = AIProviders::getAvailableProviders();
+        $defaultProviderId = $this->configuration->getDefaultProviderId($providers);
+
+        return array_map(function (AIProvider $provider) use ($defaultProviderId): array {
+            $configuration = $this->configuration->getProviderConfiguration($provider->getId());
+
+            return [
+                'id' => $provider->getId(),
+                'name' => $provider->getName(),
+                'description' => $provider->getDescription(),
+                'defaultModel' => $provider->getDefaultModel(),
+                'isDefault' => $provider->getId() === $defaultProviderId,
+                'isConfigured' => trim($configuration['apiKey'] ?? '') !== '',
+                'supportsCustomEndpoint' => $provider->supportsCustomEndpoint(),
+                'endpointUrl' => $configuration['endpointUrl'] ?? '',
+            ];
+        }, $providers->getProviders());
+    }
+
+    /**
+     * Completes a prompt using the configured default provider or a selected provider.
+     */
+    public function completePrompt(string $prompt, ?string $providerId = null): AIProviderResponse
+    {
+        $provider = $providerId !== null && $providerId !== ''
+            ? $this->getProvider($providerId)
+            : $this->getDefaultProvider();
+        $configuration = $this->configuration->getProviderConfiguration($provider->getId());
+
+        return $this->completePromptWithProvider($provider, $configuration, $prompt);
+    }
+
+    /**
+     * @param array<string, string> $configuration
+     */
+    public function completePromptWithProvider(AIProvider $provider, array $configuration, string $prompt): AIProviderResponse
+    {
+        $text = $provider->completePrompt($configuration, $prompt);
+
+        if (trim($text) === '') {
+            throw new AIProviderException(sprintf('%s returned an empty response.', $provider->getName()));
+        }
+
+        return new AIProviderResponse(
+            $provider->getId(),
+            $provider->getName(),
+            $provider->getDefaultModel(),
+            $text
+        );
+    }
+
+    private function getProvider(string $providerId): AIProvider
+    {
+        $providers = AIProviders::getAvailableProviders();
+        $provider = $providers->getProvider($providerId);
+
+        if ($provider === null) {
+            throw new InvalidArgumentException(sprintf('Unknown AI provider "%s".', $providerId));
+        }
+
+        return $provider;
     }
 }

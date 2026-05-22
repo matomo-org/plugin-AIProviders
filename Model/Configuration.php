@@ -19,6 +19,7 @@ declare(strict_types=1);
 namespace Piwik\Plugins\AIProviders\Model;
 
 use InvalidArgumentException;
+use Piwik\Common;
 use Piwik\Option;
 use Piwik\Plugin\Manager;
 use Piwik\Plugins\AIProviders\AIProvidersList;
@@ -38,7 +39,14 @@ class Configuration
     /**
      * Returns masked AI provider settings for the administration UI.
      *
-     * @return array<string, mixed> Provider metadata and masked configuration values.
+     * @return array{
+     *     defaultProviderId: string,
+     *     defaultCapabilityLevel: string,
+     *     canEditProviderConfiguration: bool,
+     *     canEditCapabilityLevel: bool,
+     *     capabilityLevels: array<string, array{label: string, description: string}>,
+     *     providers: array<int, array<string, mixed>>
+     * } Provider metadata and masked configuration values.
      */
     public function getSettings(AIProvidersList $providers): array
     {
@@ -57,6 +65,7 @@ class Configuration
                     'configuration' => [
                         'hasApiKey' => !empty($providerConfiguration['apiKey']),
                         'endpointUrl' => $providerConfiguration['endpointUrl'] ?? '',
+                        'isUsable' => $this->isProviderConfiguredForUse($provider, $providerConfiguration),
                     ],
                 ]);
             }, $providers->getProviders()),
@@ -76,20 +85,17 @@ class Configuration
         #[\SensitiveParameter]
         string $providerConfigurationsJson
     ): void {
-        $this->saveDefaultProviderId($providers, $defaultProviderId);
-
-        if (!$this->canEditCapabilityLevel()) {
-            return;
+        $providerConfigurations = $this->getProviderConfigurations();
+        if ($this->canEditProviderConfiguration()) {
+            $submittedProviderConfigurations = $this->decodeProviderConfigurations($providerConfigurationsJson);
+            $providerConfigurations = $this->saveProviderConfigurations($providers, $submittedProviderConfigurations);
         }
 
-        $this->saveDefaultCapabilityLevel($defaultCapabilityLevel);
+        $this->saveDefaultProviderId($providers, $defaultProviderId, $providerConfigurations);
 
-        if (!$this->canEditProviderConfiguration()) {
-            return;
+        if ($this->canEditCapabilityLevel()) {
+            $this->saveDefaultCapabilityLevel($defaultCapabilityLevel);
         }
-
-        $submittedProviderConfigurations = $this->decodeProviderConfigurations($providerConfigurationsJson);
-        $this->saveProviderConfigurations($providers, $submittedProviderConfigurations);
     }
 
     /**
@@ -108,6 +114,49 @@ class Configuration
             'apiKey' => '',
             'endpointUrl' => '',
         ];
+    }
+
+    /**
+     * Returns a validated server-side provider configuration, optionally using
+     * unsaved values from the admin UI for connection testing.
+     *
+     * @param array<string, mixed> $submittedProviderConfiguration
+     * @return array<string, string>
+     */
+    public function getProviderConfigurationForUse(
+        AIProvider $provider,
+        #[\SensitiveParameter]
+        array $submittedProviderConfiguration = []
+    ): array {
+        $existingProviderConfigurations = $this->getProviderConfigurations();
+        $providerId = $provider->getId();
+        $submittedProviderConfiguration = array_merge(
+            $existingProviderConfigurations[$providerId] ?? [],
+            $submittedProviderConfiguration
+        );
+
+        return [
+            'apiKey' => $this->getSubmittedApiKey(
+                $submittedProviderConfiguration,
+                $existingProviderConfigurations,
+                $providerId
+            ),
+            'endpointUrl' => $this->getSubmittedEndpointUrl($submittedProviderConfiguration, $provider),
+        ];
+    }
+
+    public function removeProviderConfiguration(string $providerId): void
+    {
+        $providerConfigurations = $this->getProviderConfigurations();
+        unset($providerConfigurations[$providerId]);
+
+        $encodedProviderConfigurations = json_encode($providerConfigurations);
+
+        if (!is_string($encodedProviderConfigurations)) {
+            throw new InvalidArgumentException('Provider configurations could not be encoded.');
+        }
+
+        Option::set(self::OPTION_PROVIDER_CONFIGURATIONS, $encodedProviderConfigurations);
     }
 
     /**
@@ -138,27 +187,67 @@ class Configuration
     }
 
     /**
-     * Returns the configured default provider ID, falling back to the first available provider.
+     * Returns the configured default provider ID, falling back to the first configured provider.
      */
     public function getDefaultProviderId(AIProvidersList $providers): string
     {
+        $providerConfigurations = $this->getProviderConfigurations();
         $providerId = Option::get(self::OPTION_DEFAULT_PROVIDER_ID);
 
-        if (!is_string($providerId) || !$providers->hasProvider($providerId)) {
-            return $providers->hasProvider(self::DEFAULT_PROVIDER_ID)
-                ? self::DEFAULT_PROVIDER_ID
-                : $this->getFirstProviderId($providers);
+        if (
+            is_string($providerId)
+            && $providers->hasProvider($providerId)
+            && $this->isProviderConfiguredForUse(
+                $providers->getProvider($providerId),
+                $providerConfigurations[$providerId] ?? []
+            )
+        ) {
+            return $providerId;
         }
 
-        return $providerId;
+        if (
+            $providers->hasProvider(self::DEFAULT_PROVIDER_ID)
+            && $this->isProviderConfiguredForUse(
+                $providers->getProvider(self::DEFAULT_PROVIDER_ID),
+                $providerConfigurations[self::DEFAULT_PROVIDER_ID] ?? []
+            )
+        ) {
+            return self::DEFAULT_PROVIDER_ID;
+        }
+
+        return $this->getFirstConfiguredProviderId($providers, $providerConfigurations);
     }
 
-    private function saveDefaultProviderId(AIProvidersList $providers, string $providerId): void
-    {
+    /**
+     * @param array<string, array<string, string>> $providerConfigurations
+     */
+    private function saveDefaultProviderId(
+        AIProvidersList $providers,
+        string $providerId,
+        array $providerConfigurations
+    ): void {
         $providerId = trim($providerId);
+
+        if ($providerId === '') {
+            $providerId = $this->getFirstConfiguredProviderId($providers, $providerConfigurations);
+
+            if ($providerId === '') {
+                Option::delete(self::OPTION_DEFAULT_PROVIDER_ID);
+                return;
+            }
+        }
 
         if (!$providers->hasProvider($providerId)) {
             throw new InvalidArgumentException(sprintf('Unknown AI provider "%s".', $providerId));
+        }
+
+        if (
+            !$this->isProviderConfiguredForUse(
+                $providers->getProvider($providerId),
+                $providerConfigurations[$providerId] ?? []
+            )
+        ) {
+            throw new InvalidArgumentException(sprintf('AI provider "%s" is not configured.', $providerId));
         }
 
         Option::set(self::OPTION_DEFAULT_PROVIDER_ID, $providerId);
@@ -232,7 +321,7 @@ class Configuration
         #[\SensitiveParameter]
         string $providerConfigurationsJson
     ): array {
-        $decoded = json_decode($providerConfigurationsJson, true);
+        $decoded = json_decode(Common::unsanitizeInputValue($providerConfigurationsJson), true);
 
         if (!is_array($decoded)) {
             throw new InvalidArgumentException('Provider configurations must be a JSON object.');
@@ -243,12 +332,13 @@ class Configuration
 
     /**
      * @param array<string, mixed> $submittedProviderConfigurations
+     * @return array<string, array<string, string>>
      */
     private function saveProviderConfigurations(
         AIProvidersList $providers,
         #[\SensitiveParameter]
         array $submittedProviderConfigurations
-    ): void {
+    ): array {
         $existingProviderConfigurations = $this->getProviderConfigurations();
         $providerConfigurations = [];
 
@@ -280,6 +370,8 @@ class Configuration
         }
 
         Option::set(self::OPTION_PROVIDER_CONFIGURATIONS, $encodedProviderConfigurations);
+
+        return $providerConfigurations;
     }
 
     /**
@@ -338,14 +430,31 @@ class Configuration
         return $endpointUrl;
     }
 
-    private function getFirstProviderId(AIProvidersList $providers): string
+    /**
+     * @param array<string, array<string, string>> $providerConfigurations
+     */
+    private function getFirstConfiguredProviderId(AIProvidersList $providers, array $providerConfigurations): string
     {
-        $availableProviders = $providers->getProviders();
+        foreach ($providers->getProviders() as $provider) {
+            $providerId = $provider->getId();
 
-        if (empty($availableProviders)) {
-            throw new InvalidArgumentException('No AI providers are available.');
+            if ($this->isProviderConfiguredForUse($provider, $providerConfigurations[$providerId] ?? [])) {
+                return $providerId;
+            }
         }
 
-        return $availableProviders[0]->getId();
+        return '';
+    }
+
+    /**
+     * @param array<string, string> $providerConfiguration
+     */
+    private function isProviderConfiguredForUse(?AIProvider $provider, array $providerConfiguration): bool
+    {
+        if ($provider === null || empty($providerConfiguration['apiKey'])) {
+            return false;
+        }
+
+        return !$provider->supportsCustomEndpoint() || !empty($providerConfiguration['endpointUrl']);
     }
 }

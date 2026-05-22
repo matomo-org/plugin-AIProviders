@@ -23,7 +23,10 @@ const props = defineProps<{
   provider: Provider;
   configuration: ProviderConfiguration | undefined;
   selected: boolean;
+  usableAsDefault: boolean;
   canEdit: boolean;
+  isTesting: boolean;
+  isDisconnecting: boolean;
 }>();
 
 /* eslint-disable func-call-spacing, no-spaced-func */
@@ -37,111 +40,147 @@ const emit = defineEmits<{
 /* eslint-enable func-call-spacing, no-spaced-func */
 
 const hasPendingKey = computed(() => (props.configuration?.apiKey ?? '') !== '');
+
+function selectProvider() {
+  if (props.usableAsDefault) {
+    emit('select');
+  }
+}
 </script>
 
 <template>
-  <label
-    :class="{ 'is-selected': selected }"
+  <div
+    :aria-checked="selected"
+    :aria-disabled="!usableAsDefault"
+    :class="{ 'is-selected': selected, 'is-not-usable': !usableAsDefault }"
     class="ai-providers-card"
+    role="radio"
+    :tabindex="usableAsDefault ? 0 : -1"
+    @click="selectProvider()"
+    @keydown.enter.prevent="selectProvider()"
+    @keydown.space.prevent="selectProvider()"
   >
-    <div class="ai-providers-card-header">
-      <input
-        :checked="selected"
-        :value="provider.id"
-        name="defaultProviderId"
-        type="radio"
-        @change="emit('select')"
-      />
-      <span class="ai-providers-card-name">{{ provider.name }}</span>
+    <div
+      v-if="selected"
+      class="ai-providers-card-default"
+    >
+      {{ translate('AIProviders_DefaultBadge') }}
     </div>
 
-    <p class="ai-providers-card-description">
-      {{ translate(provider.description) }}
-    </p>
-
-    <template v-if="canEdit">
-      <Field
-        v-if="provider.supportsCustomEndpoint"
-        :model-value="configuration?.endpointUrl"
-        :name="`endpointUrl-${provider.id}`"
-        :title="translate('AIProviders_EndpointUrl')"
-        :placeholder="translate('AIProviders_EndpointUrlPlaceholder')"
-        autocomplete="off"
-        full-width
-        uicontrol="text"
-        @update:model-value="emit('update:endpointUrl', `${$event}`)"
-      />
-
-      <Field
-        v-auto-clear-password
-        :model-value="configuration?.apiKey"
-        :name="`apiKey-${provider.id}`"
-        :placeholder="provider.configuration.hasApiKey
-          ? translate('AIProviders_ApiKeyAlreadyConfiguredPlaceholder')
-          : translate('AIProviders_ApiKeyPlaceholder')"
-        :title="translate('AIProviders_ApiKey')"
-        autocomplete="new-password"
-        full-width
-        uicontrol="password"
-        @update:model-value="emit('update:apiKey', `${$event}`)"
-      />
-
-      <div
-        :class="{ 'is-connected': provider.configuration.hasApiKey }"
-        class="ai-providers-card-status"
-      >
-        <span
-          aria-hidden="true"
-          class="icon ai-providers-status-icon"
-          :class="provider.configuration.hasApiKey ? 'icon-ok' : 'icon-minus'"
-        ></span>
-        {{
-          provider.configuration.hasApiKey
-            ? translate('AIProviders_StatusConnected')
-            : translate('AIProviders_StatusNotConnected')
-        }}
+    <div class="ai-providers-card-inner">
+      <div class="ai-providers-card-header">
+        <span class="ai-providers-card-name">{{ provider.name }}</span>
       </div>
 
-      <div class="ai-providers-card-actions">
-        <button
-          class="btn btn-disabled btn-small"
-          type="button"
-          :disabled="!hasPendingKey && !provider.configuration.hasApiKey"
-          @click.prevent="emit('test')"
+      <p class="ai-providers-card-description">
+        {{ translate(provider.description) }}
+      </p>
+
+      <template v-if="canEdit">
+        <Field
+          v-if="provider.supportsCustomEndpoint"
+          :model-value="configuration?.endpointUrl"
+          :name="`endpointUrl-${provider.id}`"
+          :title="translate('AIProviders_EndpointUrl')"
+          :placeholder="translate('AIProviders_EndpointUrlPlaceholder')"
+          autocomplete="off"
+          full-width
+          uicontrol="text"
+          @update:model-value="emit('update:endpointUrl', `${$event}`)"
+        />
+
+        <Field
+          v-auto-clear-password
+          :model-value="configuration?.apiKey"
+          :name="`apiKey-${provider.id}`"
+          :placeholder="provider.configuration.hasApiKey
+            ? translate('AIProviders_ApiKeyAlreadyConfiguredPlaceholder')
+            : translate('AIProviders_ApiKeyPlaceholder')"
+          :title="translate('AIProviders_ApiKey')"
+          autocomplete="new-password"
+          full-width
+          uicontrol="password"
+          @update:model-value="emit('update:apiKey', `${$event}`)"
+        />
+
+        <div
+          :class="{ 'is-connected': provider.configuration.isUsable }"
+          class="ai-providers-card-status"
         >
-          {{ translate('AIProviders_TestConnection') }}
-        </button>
-        <button
-          class="btn-flat"
-          type="button"
-          :disabled="!provider.configuration.hasApiKey"
-          @click.prevent="emit('disconnect')"
-        >
-          {{ translate('AIProviders_Disconnect') }}
-        </button>
-      </div>
-    </template>
-  </label>
+          <span
+            aria-hidden="true"
+            class="icon ai-providers-status-icon"
+            :class="provider.configuration.isUsable ? 'icon-ok' : 'icon-minus'"
+          ></span>
+          {{
+            provider.configuration.isUsable
+              ? translate('AIProviders_StatusConnected')
+              : translate('AIProviders_StatusNotConnected')
+          }}
+        </div>
+
+        <div class="ai-providers-card-actions">
+          <button
+            class="btn btn-small"
+            type="button"
+            :disabled="isTesting || (!hasPendingKey && !provider.configuration.hasApiKey)"
+            @click.prevent.stop="emit('test')"
+          >
+            {{
+              isTesting
+                ? translate('AIProviders_TestingConnection')
+                : translate('AIProviders_TestConnection')
+            }}
+          </button>
+          <button
+            class="btn-flat"
+            type="button"
+            :disabled="isDisconnecting || !provider.configuration.hasApiKey"
+            @click.prevent.stop="emit('disconnect')"
+          >
+            {{
+              isDisconnecting
+                ? translate('AIProviders_Disconnecting')
+                : translate('AIProviders_Disconnect')
+            }}
+          </button>
+        </div>
+      </template>
+    </div>
+  </div>
 </template>
 
 <style lang="less">
 .ai-providers-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  padding: 16px;
+  overflow: hidden;
   background: var(--theme-color-background-contrast, #fff);
   border: 1px solid var(--ai-providers-border);
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+  transition: border-color 120ms ease;
 
-  &:hover {
+  &:hover:not(.is-not-usable):not(.is-selected) {
     border-color: var(--ai-providers-border-strong);
   }
 
   &.is-selected {
+    background: var(--ai-providers-accent);
     border-color: var(--ai-providers-accent);
-    box-shadow: 0 0 0 1px var(--ai-providers-accent) inset;
+    margin-top: -24px;
+  }
+
+  &.is-not-usable {
+    cursor: default;
+  }
+
+  &:focus,
+  &:focus-visible,
+  &:active {
+    outline: none;
+    box-shadow: none;
   }
 
   // Reset Materialize wrapper margins that would otherwise double-stack with
@@ -160,7 +199,7 @@ const hasPendingKey = computed(() => (props.configuration?.apiKey ?? '') !== '')
     border: 0;
     margin-left: 0;
     margin-right: 0;
-    margin-top: 30px;
+    margin-top: 32px;
 
     > .col {
       padding-left: 0 !important;
@@ -181,7 +220,34 @@ const hasPendingKey = computed(() => (props.configuration?.apiKey ?? '') !== '')
   }
 }
 
+.ai-providers-card-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 16px;
+}
+
+.ai-providers-card.is-selected .ai-providers-card-inner {
+  background: var(--theme-color-background-contrast, #fff);
+  border-radius: 8px 8px 6px 6px;
+  margin: 0 1px 1px;
+}
+
+.ai-providers-card-default {
+  min-height: 24px;
+  padding: 5px 12px;
+  background-color: var(--ai-providers-accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
 .ai-providers-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 8px;
 }
 
