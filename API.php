@@ -18,6 +18,7 @@ declare(strict_types=1);
 
 namespace Piwik\Plugins\AIProviders;
 
+use Exception;
 use Piwik\Container\StaticContainer;
 use Piwik\Common;
 use Piwik\Piwik;
@@ -36,6 +37,7 @@ class API extends PluginAPI
      * Returns AI provider settings for the administration UI.
      *
      * @return array<string, mixed> Provider metadata and masked configuration values.
+     * @throws Exception
      */
     public function getSettings(): array
     {
@@ -58,6 +60,7 @@ class API extends PluginAPI
      * @param string $providerConfigurations JSON object keyed by provider ID
      *                                      with connection settings.
      * @return array<string, mixed> Updated provider metadata and masked configuration values.
+     * @throws Exception
      */
     public function saveSettings(
         string $defaultProviderId,
@@ -86,6 +89,7 @@ class API extends PluginAPI
      * @param string $providerConfiguration JSON object with unsaved apiKey
      *                                      and endpointUrl values.
      * @return array<string, string> Provider response metadata and completion text.
+     * @throws Exception
      */
     public function testConnection(
         string $providerId,
@@ -101,6 +105,7 @@ class API extends PluginAPI
             $this->decodeProviderConfiguration($providerConfiguration)
         );
 
+        // TODO: Maybe find a different way to test the connection than to send a prompt? Or make it shorter.
         return $this->getAIProviderService()
             ->completePromptWithProvider(
                 $provider,
@@ -115,6 +120,7 @@ class API extends PluginAPI
      *
      * @param string $providerId Provider ID to disconnect.
      * @return array<string, mixed> Updated provider metadata and masked configuration values.
+     * @throws Exception
      */
     public function disconnectProvider(string $providerId): array
     {

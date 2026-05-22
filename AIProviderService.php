@@ -129,7 +129,7 @@ class AIProviderService
         $text = $provider->completePrompt($configuration, $prompt);
 
         if (trim($text) === '') {
-            throw new AIProviderException(sprintf('%s returned an empty response.', $provider->getName()));
+            throw new \RuntimeException(sprintf('%s returned an empty response.', $provider->getName()));
         }
 
         return new AIProviderResponse(

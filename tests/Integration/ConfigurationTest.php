@@ -158,6 +158,14 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertSame('secret-claude-key', $service->getDefaultProviderConfiguration()['apiKey']);
     }
 
+    /**
+     * This test requires the OpenAI provider to be configured.
+     * It tests the service's ability to complete a prompt using the configured default provider.
+     * TODO: determine if it is fine to call the actual endpoints or if those tests should be mocked.
+     * @return void
+     * @throws \Piwik\Exception\DI\DependencyException
+     * @throws \Piwik\Exception\DI\NotFoundException
+     */
     public function testServiceCompletesPromptUsingConfiguredDefaultProvider(): void
     {
         $this->api->saveSettings(

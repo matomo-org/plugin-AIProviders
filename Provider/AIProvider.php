@@ -20,7 +20,7 @@ namespace Piwik\Plugins\AIProviders\Provider;
 
 use Exception;
 use Piwik\Http;
-use Piwik\Plugins\AIProviders\AIProviderException;
+use RuntimeException;
 
 abstract class AIProvider
 {
@@ -95,7 +95,7 @@ abstract class AIProvider
      */
     public function completePrompt(array $configuration, string $prompt): string
     {
-        throw new AIProviderException(sprintf('%s does not support prompt completion.', $this->getName()));
+        throw new RuntimeException(sprintf('%s does not support prompt completion.', $this->getName()));
     }
 
     /**
@@ -126,7 +126,7 @@ abstract class AIProvider
         $apiKey = trim($configuration['apiKey'] ?? '');
 
         if ($apiKey === '') {
-            throw new AIProviderException(sprintf('No API key is configured for %s.', $this->getName()));
+            throw new RuntimeException(sprintf('No API key is configured for %s.', $this->getName()));
         }
 
         return $apiKey;
@@ -146,7 +146,7 @@ abstract class AIProvider
         }
 
         if ($endpointUrl === '') {
-            throw new AIProviderException(sprintf('No endpoint URL is configured for %s.', $this->getName()));
+            throw new RuntimeException(sprintf('No endpoint URL is configured for %s.', $this->getName()));
         }
 
         $parsedUrl = parse_url($endpointUrl);
@@ -156,7 +156,7 @@ abstract class AIProvider
             !filter_var($endpointUrl, FILTER_VALIDATE_URL)
             || !in_array($scheme, ['http', 'https'], true)
         ) {
-            throw new AIProviderException(sprintf('The endpoint URL for %s is invalid.', $this->getName()));
+            throw new RuntimeException(sprintf('The endpoint URL for %s is invalid.', $this->getName()));
         }
 
         return $endpointUrl;
@@ -174,7 +174,7 @@ abstract class AIProvider
         $requestBody = json_encode($payload);
 
         if (!is_string($requestBody)) {
-            throw new AIProviderException(sprintf('Could not encode request body for %s.', $this->getName()));
+            throw new RuntimeException(sprintf('Could not encode request body for %s.', $this->getName()));
         }
 
         $requestHeaders = ['Content-Type: application/json'];
@@ -205,7 +205,7 @@ abstract class AIProvider
                     $requestHeaders
                 );
             } catch (Exception $e) {
-                throw new AIProviderException(sprintf(
+                throw new RuntimeException(sprintf(
                     'Could not connect to %s: %s',
                     $this->getName(),
                     $e->getMessage()
@@ -213,7 +213,7 @@ abstract class AIProvider
             }
 
             if (!is_array($response)) {
-                throw new AIProviderException(sprintf('%s returned an invalid response.', $this->getName()));
+                throw new RuntimeException(sprintf('%s returned an invalid response.', $this->getName()));
             }
 
             $status = (int) ($response['status'] ?? 0);
@@ -222,7 +222,7 @@ abstract class AIProvider
 
             if ($status >= 200 && $status < 300) {
                 if (!is_array($decoded)) {
-                    throw new AIProviderException(sprintf('%s returned invalid JSON.', $this->getName()));
+                    throw new RuntimeException(sprintf('%s returned invalid JSON.', $this->getName()));
                 }
 
                 return $decoded;
@@ -231,7 +231,7 @@ abstract class AIProvider
             $providerError = $this->getProviderErrorMessage(is_array($decoded) ? $decoded : []);
 
             if ($this->isAuthenticationError($providerError)) {
-                throw new AIProviderException(sprintf(
+                throw new RuntimeException(sprintf(
                     '%s rejected the API key. Check the key and try again.',
                     $this->getName()
                 ));
@@ -243,10 +243,10 @@ abstract class AIProvider
             }
 
             $errorSuffix = $providerError !== '' ? ': ' . substr($providerError, 0, 300) : '';
-            throw new AIProviderException(sprintf('%s request failed%s.', $this->getName(), $errorSuffix));
+            throw new RuntimeException(sprintf('%s request failed%s.', $this->getName(), $errorSuffix));
         }
 
-        throw new AIProviderException(sprintf('%s request failed.', $this->getName()));
+        throw new RuntimeException(sprintf('%s request failed.', $this->getName()));
     }
 
     /**
