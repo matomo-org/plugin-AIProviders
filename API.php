@@ -1,17 +1,10 @@
 <?php
 
 /**
- * Copyright (C) InnoCraft Ltd - All rights reserved.
+ * Matomo - free/libre analytics platform
  *
- * NOTICE:  All information contained herein is, and remains the property of InnoCraft Ltd.
- * The intellectual and technical concepts contained herein are protected by trade secret or copyright law.
- * Redistribution of this information or reproduction of this material is strictly forbidden
- * unless prior written permission is obtained from InnoCraft Ltd.
- *
- * You shall use this code only in accordance with the license agreement obtained from InnoCraft Ltd.
- *
- * @link https://www.innocraft.com/
- * @license For license details see https://www.innocraft.com/license
+ * @link    https://matomo.org
+ * @license https://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
 
 declare(strict_types=1);
@@ -23,6 +16,7 @@ use Piwik\Container\StaticContainer;
 use Piwik\Common;
 use Piwik\Piwik;
 use Piwik\Plugin\API as PluginAPI;
+use Piwik\Plugins\AIProviders\AIRequest;
 use Piwik\Plugins\AIProviders\Model\Configuration;
 use Piwik\Plugins\AIProviders\Provider\AIProvider;
 
@@ -52,8 +46,9 @@ class API extends PluginAPI
      * Saves AI provider settings from the administration UI.
      *
      * API keys should be submitted as POST data and are never returned by this
-     * API. On Matomo Cloud, provider credentials and capability level are
-     * ignored so only the default provider can be changed.
+     * API. In a managed environment (for example Matomo Cloud) the provider is
+     * forced from configuration, so the submitted default provider, credentials,
+     * and capability level are all ignored.
      *
      * @param string $defaultProviderId Provider ID to use by default.
      * @param string $defaultCapabilityLevel Default model capability level.
@@ -105,13 +100,12 @@ class API extends PluginAPI
             $this->decodeProviderConfiguration($providerConfiguration)
         );
 
-        // TODO: Maybe find a different way to test the connection than to send a prompt? Or make it shorter.
+        $request = (new AIRequest('why is the sky blue, answer in 7 words', 'AIProviders'))
+            ->withFeatureKey('test-connection')
+            ->withMaxTokens(32);
+
         return $this->getAIProviderService()
-            ->completePromptWithProvider(
-                $provider,
-                $configuration,
-                'why is the sky blue, answer in 7 words'
-            )
+            ->testProviderConnection($provider, $configuration, $request)
             ->toArray();
     }
 

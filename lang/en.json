@@ -24,17 +24,16 @@
         "MenuTitle": "AI Providers",
         "NoDefaultProviderWarning": "No AI provider can be set as the default yet. Connect a provider first.",
         "OpenAIDescription": "OpenAI models like GPT-5.5",
-        "PluginDescription": "Configure AI provider connections and default model settings used by Matomo AI features.",
         "RequestFailed": "AI provider request failed: %s",
         "SelectedConfiguration": "%1$s · %2$s",
         "SettingsSaveSuccess": "AI provider settings saved.",
         "StatusConnected": "Connected",
         "StatusNotConnected": "Not connected",
         "TestConnection": "Test connection",
-        "UnexpectedError": "Unexpected error. Please check the Matomo server logs.",
         "TestConnectionSuccess": "%1$s connection works. Response: %2$s",
         "TestingConnection": "Testing...",
         "ThinkingCapability": "Thinking",
-        "ThinkingCapabilityDescription": "Better reasoning for complex tasks."
+        "ThinkingCapabilityDescription": "Better reasoning for complex tasks.",
+        "UnexpectedError": "Unexpected error. Please check the Matomo server logs."
     }
 }

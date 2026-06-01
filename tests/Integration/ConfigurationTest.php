@@ -1,27 +1,21 @@
 <?php
 
 /**
- * Copyright (C) InnoCraft Ltd - All rights reserved.
+ * Matomo - free/libre analytics platform
  *
- * NOTICE:  All information contained herein is, and remains the property of InnoCraft Ltd.
- * The intellectual and technical concepts contained herein are protected by trade secret or copyright law.
- * Redistribution of this information or reproduction of this material is strictly forbidden
- * unless prior written permission is obtained from InnoCraft Ltd.
- *
- * You shall use this code only in accordance with the license agreement obtained from InnoCraft Ltd.
- *
- * @link https://www.innocraft.com/
- * @license For license details see https://www.innocraft.com/license
+ * @link    https://matomo.org
+ * @license https://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
 
 declare(strict_types=1);
 
 namespace Piwik\Plugins\AIProviders\tests\Integration;
 
+use Piwik\Config;
 use Piwik\Container\StaticContainer;
 use Piwik\Common;
-use Piwik\Option;
 use Piwik\Piwik;
+use Piwik\Plugins\AIProviders\AIRequest;
 use Piwik\Plugins\AIProviders\API;
 use Piwik\Plugins\AIProviders\AIProviderService;
 use Piwik\Plugins\AIProviders\Model\Configuration;
@@ -45,14 +39,23 @@ class ConfigurationTest extends IntegrationTestCase
     {
         parent::setUp();
 
-        Option::delete(Configuration::OPTION_DEFAULT_PROVIDER_ID);
-        Option::delete(Configuration::OPTION_DEFAULT_CAPABILITY_LEVEL);
-        Option::delete(Configuration::OPTION_PROVIDER_CONFIGURATIONS);
+        // Ensure no forced configuration leaks between tests.
+        Config::getInstance()->AIProviders = [];
 
         Fixture::createSuperUser();
         $this->setSuperUser();
 
         $this->api = API::getInstance();
+
+        // Reset stored settings to their defaults between tests.
+        $this->api->saveSettings('', Configuration::CAPABILITY_INSTANT, '{}');
+    }
+
+    public function tearDown(): void
+    {
+        Config::getInstance()->AIProviders = [];
+
+        parent::tearDown();
     }
 
     public function testGetSettingsReturnsDefaultProviderConfiguration(): void
@@ -158,15 +161,7 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertSame('secret-claude-key', $service->getDefaultProviderConfiguration()['apiKey']);
     }
 
-    /**
-     * This test requires the OpenAI provider to be configured.
-     * It tests the service's ability to complete a prompt using the configured default provider.
-     * TODO: determine if it is fine to call the actual endpoints or if those tests should be mocked.
-     * @return void
-     * @throws \Piwik\Exception\DI\DependencyException
-     * @throws \Piwik\Exception\DI\NotFoundException
-     */
-    public function testServiceCompletesPromptUsingConfiguredDefaultProvider(): void
+    public function testServiceCompletesRequestUsingConfiguredDefaultProvider(): void
     {
         $this->api->saveSettings(
             'openai',
@@ -181,10 +176,97 @@ class ConfigurationTest extends IntegrationTestCase
         $this->mockAIProviderResponse('Because molecules scatter blue light more strongly.');
 
         $response = StaticContainer::get(AIProviderService::class)
-            ->completePrompt('why is the sky blue, answer in 7 words');
+            ->complete(new AIRequest('why is the sky blue, answer in 7 words', 'Test'));
 
         $this->assertSame('openai', $response->toArray()['providerId']);
         $this->assertSame('Because molecules scatter blue light more strongly.', $response->getText());
+        $this->assertSame(12, $response->getInputTokens());
+        $this->assertSame(7, $response->getOutputTokens());
+    }
+
+    public function testRequestForwardsSystemPromptModelAndOptionsToProvider(): void
+    {
+        $this->api->saveSettings(
+            'openai',
+            Configuration::CAPABILITY_INSTANT,
+            (string) json_encode([
+                'openai' => [
+                    'apiKey' => 'secret-openai-key',
+                    'endpointUrl' => '',
+                ],
+            ])
+        );
+
+        $capturedBody = null;
+        Piwik::addAction('Http.sendHttpRequest', function (
+            string $url,
+            array $httpEventParams,
+            ?string &$response,
+            ?int &$status,
+            array &$headers
+        ) use (&$capturedBody): void {
+            $capturedBody = json_decode((string) $httpEventParams['body'], true);
+            $response = (string) json_encode([
+                'choices' => [['message' => ['content' => 'Blue light scatters most.']]],
+            ]);
+            $status = 200;
+            $headers = ['Content-Type' => 'application/json'];
+        });
+
+        $request = (new AIRequest('why is the sky blue', 'Test'))
+            ->withSystemPrompt('You are concise.')
+            ->withModel('gpt-4o-mini')
+            ->withMaxTokens(64)
+            ->withTemperature(0.5);
+
+        $response = StaticContainer::get(AIProviderService::class)->complete($request);
+
+        $this->assertSame('Blue light scatters most.', $response->getText());
+        $this->assertIsArray($capturedBody);
+        $this->assertSame('gpt-4o-mini', $capturedBody['model']);
+        $this->assertSame(64, $capturedBody['max_tokens']);
+        $this->assertSame(0.5, $capturedBody['temperature']);
+        $this->assertSame(
+            [
+                ['role' => 'system', 'content' => 'You are concise.'],
+                ['role' => 'user', 'content' => 'why is the sky blue'],
+            ],
+            $capturedBody['messages']
+        );
+    }
+
+    public function testServiceUsesForcedProviderAndIgnoresRequestedProvider(): void
+    {
+        $this->api->saveSettings(
+            'openai',
+            Configuration::CAPABILITY_INSTANT,
+            (string) json_encode([
+                'openai' => [
+                    'apiKey' => 'secret-openai-key',
+                    'endpointUrl' => '',
+                ],
+            ])
+        );
+
+        // Simulate a managed environment forcing the provider from config.ini.php.
+        Config::getInstance()->AIProviders = ['defaultProvider' => 'openai'];
+        $this->mockAIProviderResponse('Because molecules scatter blue light more strongly.');
+
+        $response = StaticContainer::get(AIProviderService::class)
+            ->complete((new AIRequest('why is the sky blue', 'Test'))->withProviderId('claude'));
+
+        $this->assertSame('openai', $response->toArray()['providerId']);
+    }
+
+    public function testForcedDefaultProviderFromConfigLocksConfiguration(): void
+    {
+        Config::getInstance()->AIProviders = ['defaultProvider' => 'openai'];
+
+        $settings = $this->api->getSettings();
+
+        $this->assertSame('openai', $settings['defaultProviderId']);
+        $this->assertFalse($settings['canEditProviderConfiguration']);
+        $this->assertFalse($settings['canEditCapabilityLevel']);
     }
 
     public function testApiTestsConnectionWithUnsavedProviderConfiguration(): void
@@ -362,6 +444,10 @@ class ConfigurationTest extends IntegrationTestCase
                             'content' => $text,
                         ],
                     ],
+                ],
+                'usage' => [
+                    'prompt_tokens' => 12,
+                    'completion_tokens' => 7,
                 ],
             ]);
             $status = 200;

@@ -1,22 +1,18 @@
 <?php
 
 /**
- * Copyright (C) InnoCraft Ltd - All rights reserved.
+ * Matomo - free/libre analytics platform
  *
- * NOTICE:  All information contained herein is, and remains the property of InnoCraft Ltd.
- * The intellectual and technical concepts contained herein are protected by trade secret or copyright law.
- * Redistribution of this information or reproduction of this material is strictly forbidden
- * unless prior written permission is obtained from InnoCraft Ltd.
- *
- * You shall use this code only in accordance with the license agreement obtained from InnoCraft Ltd.
- *
- * @link https://www.innocraft.com/
- * @license For license details see https://www.innocraft.com/license
+ * @link    https://matomo.org
+ * @license https://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
 
 declare(strict_types=1);
 
 namespace Piwik\Plugins\AIProviders\Provider;
+
+use Piwik\Plugins\AIProviders\AIProviderResponse;
+use Piwik\Plugins\AIProviders\AIRequest;
 
 class OpenAI extends AIProvider
 {
@@ -40,28 +36,12 @@ class OpenAI extends AIProvider
     /**
      * @param array<string, string> $configuration
      */
-    public function completePrompt(array $configuration, string $prompt): string
+    public function complete(AIRequest $request, array $configuration): AIProviderResponse
     {
-        $response = $this->sendJsonRequest(
+        return $this->completeChatCompletion(
+            $request,
             $this->getEndpointUrl($configuration),
-            [
-                'Authorization' => 'Bearer ' . $this->getApiKey($configuration),
-            ],
-            [
-                'model' => $this->getDefaultModel(),
-                'messages' => [
-                    [
-                        'role' => 'user',
-                        'content' => $prompt,
-                    ],
-                ],
-                'max_tokens' => 80,
-                'temperature' => 0.2,
-            ]
+            ['Authorization' => 'Bearer ' . $this->getApiKey($configuration)]
         );
-
-        $text = $response['choices'][0]['message']['content'] ?? '';
-
-        return is_string($text) ? trim($text) : '';
     }
 }

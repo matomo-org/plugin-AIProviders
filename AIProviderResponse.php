@@ -1,17 +1,10 @@
 <?php
 
 /**
- * Copyright (C) InnoCraft Ltd - All rights reserved.
+ * Matomo - free/libre analytics platform
  *
- * NOTICE: All information contained herein is, and remains the property of InnoCraft Ltd.
- * The intellectual and technical concepts contained herein are protected by trade secret or copyright law.
- * Redistribution of this information or reproduction of this material is strictly forbidden
- * unless prior written permission is obtained from InnoCraft Ltd.
- *
- * You shall use this code only in accordance with the license agreement obtained from InnoCraft Ltd.
- *
- * @link https://www.innocraft.com/
- * @license For license details see https://www.innocraft.com/license
+ * @link    https://matomo.org
+ * @license https://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
 
 declare(strict_types=1);
@@ -40,12 +33,36 @@ class AIProviderResponse
      */
     private $text;
 
-    public function __construct(string $providerId, string $providerName, string $model, string $text)
-    {
+    /**
+     * Number of input (prompt) tokens reported by the provider, or null when
+     * the provider does not report token usage.
+     *
+     * @var int|null
+     */
+    private $inputTokens;
+
+    /**
+     * Number of output (completion) tokens reported by the provider, or null
+     * when the provider does not report token usage.
+     *
+     * @var int|null
+     */
+    private $outputTokens;
+
+    public function __construct(
+        string $providerId,
+        string $providerName,
+        string $model,
+        string $text,
+        ?int $inputTokens = null,
+        ?int $outputTokens = null
+    ) {
         $this->providerId = $providerId;
         $this->providerName = $providerName;
         $this->model = $model;
         $this->text = $text;
+        $this->inputTokens = $inputTokens;
+        $this->outputTokens = $outputTokens;
     }
 
     public function getText(): string
@@ -53,8 +70,23 @@ class AIProviderResponse
         return $this->text;
     }
 
+    public function getModel(): string
+    {
+        return $this->model;
+    }
+
+    public function getInputTokens(): ?int
+    {
+        return $this->inputTokens;
+    }
+
+    public function getOutputTokens(): ?int
+    {
+        return $this->outputTokens;
+    }
+
     /**
-     * @return array<string, string>
+     * @return array<string, mixed>
      */
     public function toArray(): array
     {
@@ -63,6 +95,8 @@ class AIProviderResponse
             'providerName' => $this->providerName,
             'model' => $this->model,
             'text' => $this->text,
+            'inputTokens' => $this->inputTokens,
+            'outputTokens' => $this->outputTokens,
         ];
     }
 }

@@ -1,22 +1,18 @@
 <?php
 
 /**
- * Copyright (C) InnoCraft Ltd - All rights reserved.
+ * Matomo - free/libre analytics platform
  *
- * NOTICE:  All information contained herein is, and remains the property of InnoCraft Ltd.
- * The intellectual and technical concepts contained herein are protected by trade secret or copyright law.
- * Redistribution of this information or reproduction of this material is strictly forbidden
- * unless prior written permission is obtained from InnoCraft Ltd.
- *
- * You shall use this code only in accordance with the license agreement obtained from InnoCraft Ltd.
- *
- * @link https://www.innocraft.com/
- * @license For license details see https://www.innocraft.com/license
+ * @link    https://matomo.org
+ * @license https://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
 
 declare(strict_types=1);
 
 namespace Piwik\Plugins\AIProviders\Provider;
+
+use Piwik\Plugins\AIProviders\AIProviderResponse;
+use Piwik\Plugins\AIProviders\AIRequest;
 
 class Gemini extends AIProvider
 {
@@ -29,10 +25,7 @@ class Gemini extends AIProvider
 
     public function getDefaultEndpointUrl(): string
     {
-        return sprintf(
-            'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent',
-            $this->getDefaultModel()
-        );
+        return $this->getEndpointUrlForModel($this->getDefaultModel());
     }
 
     public function getDefaultModel(): string
@@ -41,34 +34,63 @@ class Gemini extends AIProvider
     }
 
     /**
+     * Custom Gemini chat completion method.
+     * @see https://ai.google.dev/gemini-api/docs/text-generation
      * @param array<string, string> $configuration
      */
-    public function completePrompt(array $configuration, string $prompt): string
+    public function complete(AIRequest $request, array $configuration): AIProviderResponse
     {
-        $response = $this->sendJsonRequest(
-            $this->getEndpointUrl($configuration),
-            [
-                'x-goog-api-key' => $this->getApiKey($configuration),
-            ],
-            [
-                'contents' => [
-                    [
-                        'parts' => [
-                            [
-                                'text' => $prompt,
-                            ],
+        $model = $this->resolveModel($request);
+
+        $payload = [
+            'contents' => [
+                [
+                    'parts' => [
+                        [
+                            'text' => $request->getUserPrompt(),
                         ],
                     ],
                 ],
-                'generationConfig' => [
-                    'maxOutputTokens' => 80,
-                    'temperature' => 0.2,
+            ],
+            'generationConfig' => [
+                'maxOutputTokens' => $request->getMaxTokens(),
+                'temperature' => $request->getTemperature(),
+            ],
+        ];
+
+        if ($request->getSystemPrompt() !== null && $request->getSystemPrompt() !== '') {
+            $payload['systemInstruction'] = [
+                'parts' => [
+                    [
+                        'text' => $request->getSystemPrompt(),
+                    ],
                 ],
-            ]
+            ];
+        }
+
+        $response = $this->sendJsonRequest(
+            $this->getEndpointUrlForModel($model),
+            [
+                'x-goog-api-key' => $this->getApiKey($configuration),
+            ],
+            $payload
         );
 
         $text = $response['candidates'][0]['content']['parts'][0]['text'] ?? '';
 
-        return is_string($text) ? trim($text) : '';
+        return $this->buildResponse(
+            $model,
+            is_string($text) ? $text : '',
+            isset($response['usageMetadata']['promptTokenCount']) ? (int) $response['usageMetadata']['promptTokenCount'] : null,
+            isset($response['usageMetadata']['candidatesTokenCount']) ? (int) $response['usageMetadata']['candidatesTokenCount'] : null
+        );
+    }
+
+    private function getEndpointUrlForModel(string $model): string
+    {
+        return sprintf(
+            'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent',
+            $model
+        );
     }
 }

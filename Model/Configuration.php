@@ -1,17 +1,10 @@
 <?php
 
 /**
- * Copyright (C) InnoCraft Ltd - All rights reserved.
+ * Matomo - free/libre analytics platform
  *
- * NOTICE: All information contained herein is, and remains the property of InnoCraft Ltd.
- * The intellectual and technical concepts contained herein are protected by trade secret or copyright law.
- * Redistribution of this information or reproduction of this material is strictly forbidden
- * unless prior written permission is obtained from InnoCraft Ltd.
- *
- * You shall use this code only in accordance with the license agreement obtained from InnoCraft Ltd.
- *
- * @link https://www.innocraft.com/
- * @license For license details see https://www.innocraft.com/license
+ * @link    https://matomo.org
+ * @license https://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
 
 declare(strict_types=1);
@@ -20,21 +13,71 @@ namespace Piwik\Plugins\AIProviders\Model;
 
 use InvalidArgumentException;
 use Piwik\Common;
-use Piwik\Option;
-use Piwik\Plugin\Manager;
+use Piwik\Settings\FieldConfig;
+use Piwik\Settings\Plugin\SystemSetting;
 use Piwik\Plugins\AIProviders\AIProvidersList;
 use Piwik\Plugins\AIProviders\Provider\AIProvider;
 
 class Configuration
 {
-    public const OPTION_DEFAULT_PROVIDER_ID = 'AIProviders.defaultProviderId';
-    public const OPTION_DEFAULT_CAPABILITY_LEVEL = 'AIProviders.defaultCapabilityLevel';
-    public const OPTION_PROVIDER_CONFIGURATIONS = 'AIProviders.providerConfigurations';
+    public const SETTING_DEFAULT_PROVIDER = 'defaultProvider';
+    public const SETTING_DEFAULT_CAPABILITY_LEVEL = 'defaultCapabilityLevel';
+    public const SETTING_PROVIDER_CREDENTIALS = 'providerCredentials';
 
     public const CAPABILITY_INSTANT = 'instant';
     public const CAPABILITY_THINKING = 'thinking';
 
+    private const PLUGIN_NAME = 'AIProviders';
     private const DEFAULT_PROVIDER_ID = 'openai';
+
+    /**
+     * Stored default provider ID. Persisted in the plugin settings storage, but
+     * not shown on the generic plugin settings page (the settings are not
+     * registered in a settings container). The value can be overridden and
+     * locked from `config.ini.php`, which is how managed environments such as
+     * Matomo Cloud force a provider:
+     *
+     *     [AIProviders]
+     *     defaultProvider = "bedrock"
+     *
+     * @var SystemSetting
+     */
+    private $defaultProvider;
+
+    /**
+     * @var SystemSetting
+     */
+    private $defaultCapabilityLevel;
+
+    /**
+     * Per-provider connection settings keyed by provider ID, for example
+     * `['openai' => ['apiKey' => '...', 'endpointUrl' => '']]`.
+     *
+     * @var SystemSetting
+     */
+    private $providerCredentials;
+
+    public function __construct()
+    {
+        $this->defaultProvider = new SystemSetting(
+            self::SETTING_DEFAULT_PROVIDER,
+            '',
+            FieldConfig::TYPE_STRING,
+            self::PLUGIN_NAME
+        );
+        $this->defaultCapabilityLevel = new SystemSetting(
+            self::SETTING_DEFAULT_CAPABILITY_LEVEL,
+            self::CAPABILITY_INSTANT,
+            FieldConfig::TYPE_STRING,
+            self::PLUGIN_NAME
+        );
+        $this->providerCredentials = new SystemSetting(
+            self::SETTING_PROVIDER_CREDENTIALS,
+            [],
+            FieldConfig::TYPE_ARRAY,
+            self::PLUGIN_NAME
+        );
+    }
 
     /**
      * Returns masked AI provider settings for the administration UI.
@@ -75,8 +118,8 @@ class Configuration
     /**
      * Saves the default provider, capability level, and provider connection settings.
      *
-     * On Matomo Cloud, provider connection settings are managed outside this
-     * plugin, so only the default provider is persisted.
+     * In a managed environment (for example Matomo Cloud) the provider and its
+     * credentials are forced from configuration, so nothing is persisted here.
      */
     public function saveSettings(
         AIProvidersList $providers,
@@ -85,13 +128,11 @@ class Configuration
         #[\SensitiveParameter]
         string $providerConfigurationsJson
     ): void {
-        $providerConfigurations = $this->getProviderConfigurations();
         if ($this->canEditProviderConfiguration()) {
             $submittedProviderConfigurations = $this->decodeProviderConfigurations($providerConfigurationsJson);
             $providerConfigurations = $this->saveProviderConfigurations($providers, $submittedProviderConfigurations);
+            $this->saveDefaultProviderId($providers, $defaultProviderId, $providerConfigurations);
         }
-
-        $this->saveDefaultProviderId($providers, $defaultProviderId, $providerConfigurations);
 
         if ($this->canEditCapabilityLevel()) {
             $this->saveDefaultCapabilityLevel($defaultCapabilityLevel);
@@ -150,13 +191,8 @@ class Configuration
         $providerConfigurations = $this->getProviderConfigurations();
         unset($providerConfigurations[$providerId]);
 
-        $encodedProviderConfigurations = json_encode($providerConfigurations);
-
-        if (!is_string($encodedProviderConfigurations)) {
-            throw new InvalidArgumentException('Provider configurations could not be encoded.');
-        }
-
-        Option::set(self::OPTION_PROVIDER_CONFIGURATIONS, $encodedProviderConfigurations);
+        $this->providerCredentials->setValue($providerConfigurations);
+        $this->providerCredentials->save();
     }
 
     /**
@@ -176,14 +212,38 @@ class Configuration
         ];
     }
 
+    /**
+     * Returns whether provider connections can be edited in the UI.
+     *
+     * Provider configuration is locked whenever the default provider is forced
+     * from configuration (a managed environment such as Matomo Cloud).
+     */
     public function canEditProviderConfiguration(): bool
     {
-        return !Manager::getInstance()->isPluginActivated('Cloud');
+        return !$this->isManaged();
     }
 
     public function canEditCapabilityLevel(): bool
     {
-        return !Manager::getInstance()->isPluginActivated('Cloud');
+        return !$this->isManaged();
+    }
+
+    /**
+     * Returns the forced provider ID when running in a managed environment, or
+     * null when the default provider may be chosen freely.
+     *
+     * Trusted callers use this to honour the centrally managed provider even
+     * when they request a specific one.
+     */
+    public function getForcedProviderId(): ?string
+    {
+        if (!$this->isManaged()) {
+            return null;
+        }
+
+        $providerId = $this->defaultProvider->getValue();
+
+        return is_string($providerId) && $providerId !== '' ? $providerId : null;
     }
 
     /**
@@ -192,7 +252,16 @@ class Configuration
     public function getDefaultProviderId(AIProvidersList $providers): string
     {
         $providerConfigurations = $this->getProviderConfigurations();
-        $providerId = Option::get(self::OPTION_DEFAULT_PROVIDER_ID);
+        $providerId = $this->defaultProvider->getValue();
+
+        /**
+         * When forced from configuration (for example Matomo Cloud), use the
+         * configured provider as-is so misconfiguration surfaces a clear error
+         * from the provider rather than silently falling back.
+         */
+        if ($this->isManaged() && is_string($providerId) && $providerId !== '' && $providers->hasProvider($providerId)) {
+            return $providerId;
+        }
 
         if (
             is_string($providerId)
@@ -232,7 +301,8 @@ class Configuration
             $providerId = $this->getFirstConfiguredProviderId($providers, $providerConfigurations);
 
             if ($providerId === '') {
-                Option::delete(self::OPTION_DEFAULT_PROVIDER_ID);
+                $this->defaultProvider->setValue('');
+                $this->defaultProvider->save();
                 return;
             }
         }
@@ -250,7 +320,8 @@ class Configuration
             throw new InvalidArgumentException(sprintf('AI provider "%s" is not configured.', $providerId));
         }
 
-        Option::set(self::OPTION_DEFAULT_PROVIDER_ID, $providerId);
+        $this->defaultProvider->setValue($providerId);
+        $this->defaultProvider->save();
     }
 
     /**
@@ -258,7 +329,7 @@ class Configuration
      */
     public function getDefaultCapabilityLevel(): string
     {
-        $capabilityLevel = Option::get(self::OPTION_DEFAULT_CAPABILITY_LEVEL);
+        $capabilityLevel = $this->defaultCapabilityLevel->getValue();
 
         if (!is_string($capabilityLevel) || !array_key_exists($capabilityLevel, $this->getCapabilityLevels())) {
             return self::CAPABILITY_INSTANT;
@@ -275,7 +346,17 @@ class Configuration
             throw new InvalidArgumentException(sprintf('Unknown AI model capability level "%s".', $capabilityLevel));
         }
 
-        Option::set(self::OPTION_DEFAULT_CAPABILITY_LEVEL, $capabilityLevel);
+        $this->defaultCapabilityLevel->setValue($capabilityLevel);
+        $this->defaultCapabilityLevel->save();
+    }
+
+    /**
+     * Returns whether the plugin runs in a managed environment, that is, the
+     * default provider is forced (and locked) from configuration.
+     */
+    private function isManaged(): bool
+    {
+        return !$this->defaultProvider->isWritableByCurrentUser();
     }
 
     /**
@@ -283,20 +364,14 @@ class Configuration
      */
     private function getProviderConfigurations(): array
     {
-        $rawValue = Option::get(self::OPTION_PROVIDER_CONFIGURATIONS);
+        $rawValue = $this->providerCredentials->getValue();
 
-        if (!is_string($rawValue) || $rawValue === '') {
-            return [];
-        }
-
-        $decoded = json_decode($rawValue, true);
-
-        if (!is_array($decoded)) {
+        if (!is_array($rawValue)) {
             return [];
         }
 
         $providerConfigurations = [];
-        foreach ($decoded as $providerId => $providerConfiguration) {
+        foreach ($rawValue as $providerId => $providerConfiguration) {
             if (!is_string($providerId) || !is_array($providerConfiguration)) {
                 continue;
             }
@@ -363,13 +438,8 @@ class Configuration
             ];
         }
 
-        $encodedProviderConfigurations = json_encode($providerConfigurations);
-
-        if (!is_string($encodedProviderConfigurations)) {
-            throw new InvalidArgumentException('Provider configurations could not be encoded.');
-        }
-
-        Option::set(self::OPTION_PROVIDER_CONFIGURATIONS, $encodedProviderConfigurations);
+        $this->providerCredentials->setValue($providerConfigurations);
+        $this->providerCredentials->save();
 
         return $providerConfigurations;
     }
@@ -451,10 +521,10 @@ class Configuration
      */
     private function isProviderConfiguredForUse(?AIProvider $provider, array $providerConfiguration): bool
     {
-        if ($provider === null || empty($providerConfiguration['apiKey'])) {
+        if ($provider === null) {
             return false;
         }
 
-        return !$provider->supportsCustomEndpoint() || !empty($providerConfiguration['endpointUrl']);
+        return $provider->isConfigured($providerConfiguration);
     }
 }

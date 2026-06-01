@@ -1,17 +1,10 @@
 <?php
 
 /**
- * Copyright (C) InnoCraft Ltd - All rights reserved.
+Ca * Matomo - free/libre analytics platform
  *
- * NOTICE:  All information contained herein is, and remains the property of InnoCraft Ltd.
- * The intellectual and technical concepts contained herein are protected by trade secret or copyright law.
- * Redistribution of this information or reproduction of this material is strictly forbidden
- * unless prior written permission is obtained from InnoCraft Ltd.
- *
- * You shall use this code only in accordance with the license agreement obtained from InnoCraft Ltd.
- *
- * @link https://www.innocraft.com/
- * @license For license details see https://www.innocraft.com/license
+ * @link    https://matomo.org
+ * @license https://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
 
 declare(strict_types=1);
@@ -20,6 +13,8 @@ namespace Piwik\Plugins\AIProviders\Provider;
 
 use Exception;
 use Piwik\Http;
+use Piwik\Plugins\AIProviders\AIProviderResponse;
+use Piwik\Plugins\AIProviders\AIRequest;
 use RuntimeException;
 
 abstract class AIProvider
@@ -89,13 +84,101 @@ abstract class AIProvider
     }
 
     /**
-     * Completes the given prompt using the provider.
+     * Completes the given request using the provider.
+     *
+     * Implementations should honor the request's system prompt, model,
+     * max tokens, and temperature, and populate token usage on the response
+     * when the provider reports it.
      *
      * @param array<string, string> $configuration
      */
-    public function completePrompt(array $configuration, string $prompt): string
+    abstract public function complete(AIRequest $request, array $configuration): AIProviderResponse;
+
+    /**
+     * Returns whether the provider has everything it needs to run completions.
+     *
+     * The default implementation requires an API key, plus a custom endpoint
+     * URL for providers that support one. Providers whose credentials are
+     * supplied by the environment (rather than stored configuration) should
+     * override this method.
+     *
+     * @param array<string, string> $configuration
+     */
+    public function isConfigured(array $configuration): bool
     {
-        throw new RuntimeException(sprintf('%s does not support prompt completion.', $this->getName()));
+        if (trim($configuration['apiKey'] ?? '') === '') {
+            return false;
+        }
+
+        return !$this->supportsCustomEndpoint() || trim($configuration['endpointUrl'] ?? '') !== '';
+    }
+
+    /**
+     * Returns the model to use for the request, falling back to the provider default.
+     */
+    protected function resolveModel(AIRequest $request): string
+    {
+        $model = $request->getModel();
+
+        return $model !== null && $model !== '' ? $model : $this->getDefaultModel();
+    }
+
+    /**
+     * @param int|null $inputTokens  Prompt tokens reported by the provider, if any.
+     * @param int|null $outputTokens Completion tokens reported by the provider, if any.
+     */
+    protected function buildResponse(
+        string $model,
+        string $text,
+        ?int $inputTokens = null,
+        ?int $outputTokens = null
+    ): AIProviderResponse {
+        return new AIProviderResponse(
+            $this->getId(),
+            $this->getName(),
+            $model,
+            trim($text),
+            $inputTokens,
+            $outputTokens
+        );
+    }
+
+    /**
+     * Completes a request against an OpenAI-compatible Chat Completions endpoint.
+     *
+     * Shared by providers that speak the OpenAI `/chat/completions` wire format
+     * (system + user messages, `max_tokens`/`temperature`, and a `usage` object
+     * with `prompt_tokens`/`completion_tokens`).
+     *
+     * @param array<string, string> $headers Additional request headers, such as authentication.
+     */
+    protected function completeChatCompletion(AIRequest $request, string $endpointUrl, array $headers): AIProviderResponse
+    {
+        $messages = [];
+
+        if ($request->getSystemPrompt() !== null && $request->getSystemPrompt() !== '') {
+            $messages[] = ['role' => 'system', 'content' => $request->getSystemPrompt()];
+        }
+
+        $messages[] = ['role' => 'user', 'content' => $request->getUserPrompt()];
+
+        $model = $this->resolveModel($request);
+
+        $response = $this->sendJsonRequest($endpointUrl, $headers, [
+            'model' => $model,
+            'messages' => $messages,
+            'max_tokens' => $request->getMaxTokens(),
+            'temperature' => $request->getTemperature(),
+        ]);
+
+        $text = $response['choices'][0]['message']['content'] ?? '';
+
+        return $this->buildResponse(
+            $model,
+            is_string($text) ? $text : '',
+            isset($response['usage']['prompt_tokens']) ? (int) $response['usage']['prompt_tokens'] : null,
+            isset($response['usage']['completion_tokens']) ? (int) $response['usage']['completion_tokens'] : null
+        );
     }
 
     /**

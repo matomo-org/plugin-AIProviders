@@ -1,24 +1,19 @@
 <?php
 
 /**
- * Copyright (C) InnoCraft Ltd - All rights reserved.
+ * Matomo - free/libre analytics platform
  *
- * NOTICE:  All information contained herein is, and remains the property of InnoCraft Ltd.
- * The intellectual and technical concepts contained herein are protected by trade secret or copyright law.
- * Redistribution of this information or reproduction of this material is strictly forbidden
- * unless prior written permission is obtained from InnoCraft Ltd.
- *
- * You shall use this code only in accordance with the license agreement obtained from InnoCraft Ltd.
- *
- * @link https://www.innocraft.com/
- * @license For license details see https://www.innocraft.com/license
+ * @link    https://matomo.org
+ * @license https://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
 
 declare(strict_types=1);
 
 namespace Piwik\Plugins\AIProviders;
 
+use Piwik\Container\StaticContainer;
 use Piwik\Plugins\AIProviders\Provider\AIProvider;
+use Psr\Log\LoggerInterface;
 
 class AIProvidersList
 {
@@ -29,7 +24,27 @@ class AIProvidersList
 
     public function addProvider(AIProvider $provider): void
     {
-        $this->providers[$provider->getId()] = $provider;
+        $providerId = $provider->getId();
+
+        if (isset($this->providers[$providerId])) {
+            /**
+             * Overriding an existing provider is currently allowed: the last
+             * registration for a given ID wins. Matomo logs it so an accidental or
+             * unexpected override of a built-in provider is visible.
+             * TODO: decide whether built-in provider IDs should be protected
+             * from being overridden by other plugins.
+             */
+            StaticContainer::get(LoggerInterface::class)->warning(
+                'AI provider "{id}" was overridden: {old} replaced by {new}.',
+                [
+                    'id' => $providerId,
+                    'old' => get_class($this->providers[$providerId]),
+                    'new' => get_class($provider),
+                ]
+            );
+        }
+
+        $this->providers[$providerId] = $provider;
     }
 
     public function removeProvider(string $providerId): void
