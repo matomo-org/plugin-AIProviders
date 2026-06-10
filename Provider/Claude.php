@@ -54,8 +54,9 @@ class Claude extends AIProvider
             ],
         ];
 
-        if ($request->getSystemPrompt() !== null && $request->getSystemPrompt() !== '') {
-            $payload['system'] = $request->getSystemPrompt();
+        $systemPrompt = $this->getSystemPrompt($request);
+        if ($systemPrompt !== null && $systemPrompt !== '') {
+            $payload['system'] = $systemPrompt;
         }
 
         $response = $this->sendJsonRequest(

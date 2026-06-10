@@ -28,20 +28,23 @@ class AIProvidersList
 
         if (isset($this->providers[$providerId])) {
             /**
-             * Overriding an existing provider is currently allowed: the last
-             * registration for a given ID wins. Matomo logs it so an accidental or
-             * unexpected override of a built-in provider is visible.
-             * TODO: decide whether built-in provider IDs should be protected
-             * from being overridden by other plugins.
+             * Provider IDs are unique and cannot be overwritten: the first
+             * registration for a given ID wins and later registrations are
+             * ignored. This protects the built-in providers (and a provider that
+             * is centrally forced in a managed multi-tenant environment such as
+             * Matomo Cloud) from being shadowed by another plugin. The ignored
+             * registration is logged so the collision is visible.
              */
             StaticContainer::get(LoggerInterface::class)->warning(
-                'AI provider "{id}" was overridden: {old} replaced by {new}.',
+                'AI provider "{id}" is already registered as {existing}; ignoring duplicate registration of {ignored}.',
                 [
                     'id' => $providerId,
-                    'old' => get_class($this->providers[$providerId]),
-                    'new' => get_class($provider),
+                    'existing' => get_class($this->providers[$providerId]),
+                    'ignored' => get_class($provider),
                 ]
             );
+
+            return;
         }
 
         $this->providers[$providerId] = $provider;

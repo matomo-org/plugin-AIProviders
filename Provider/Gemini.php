@@ -58,11 +58,16 @@ class Gemini extends AIProvider
             ],
         ];
 
-        if ($request->getSystemPrompt() !== null && $request->getSystemPrompt() !== '') {
+        if ($request->isJsonResponse()) {
+            $payload['generationConfig']['responseMimeType'] = 'application/json';
+        }
+
+        $systemPrompt = $this->getSystemPrompt($request);
+        if ($systemPrompt !== null && $systemPrompt !== '') {
             $payload['systemInstruction'] = [
                 'parts' => [
                     [
-                        'text' => $request->getSystemPrompt(),
+                        'text' => $systemPrompt,
                     ],
                 ],
             ];

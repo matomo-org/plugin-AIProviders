@@ -86,6 +86,20 @@ class AIProviderResponse
     }
 
     /**
+     * Returns the response text decoded as a JSON array/object, or null when the
+     * text is not valid JSON. Intended for requests made with
+     * {@link AIRequest::withJsonResponse()}.
+     *
+     * @return array<mixed>|null
+     */
+    public function getJsonData(): ?array
+    {
+        $decoded = json_decode($this->text, true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toArray(): array

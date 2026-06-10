@@ -35,6 +35,9 @@ class AIRequest
     public const DEFAULT_MAX_TOKENS = 1024;
     public const DEFAULT_TEMPERATURE = 0.2;
 
+    public const FORMAT_TEXT = 'text';
+    public const FORMAT_JSON = 'json';
+
     /**
      * @var string
      */
@@ -93,6 +96,15 @@ class AIRequest
      * @var float
      */
     private $temperature = self::DEFAULT_TEMPERATURE;
+
+    /**
+     * Desired response format: FORMAT_TEXT (default) or FORMAT_JSON. In JSON mode
+     * the provider is asked to return a single JSON object — natively where the
+     * provider supports it, otherwise via an explicit instruction.
+     *
+     * @var string
+     */
+    private $responseFormat = self::FORMAT_TEXT;
 
     public function __construct(string $userPrompt, string $callerPluginName)
     {
@@ -164,6 +176,18 @@ class AIRequest
         return $request;
     }
 
+    /**
+     * Requests a JSON response. The provider is asked to return a single valid
+     * JSON object; read it with {@link AIProviderResponse::getJsonData()}.
+     */
+    public function withJsonResponse(): self
+    {
+        $request = clone $this;
+        $request->responseFormat = self::FORMAT_JSON;
+
+        return $request;
+    }
+
     public function getUserPrompt(): string
     {
         return $this->userPrompt;
@@ -212,5 +236,15 @@ class AIRequest
     public function getTemperature(): float
     {
         return $this->temperature;
+    }
+
+    public function getResponseFormat(): string
+    {
+        return $this->responseFormat;
+    }
+
+    public function isJsonResponse(): bool
+    {
+        return $this->responseFormat === self::FORMAT_JSON;
     }
 }

@@ -15,10 +15,13 @@ use Piwik\Config;
 use Piwik\Container\StaticContainer;
 use Piwik\Common;
 use Piwik\Piwik;
+use Piwik\Plugins\AIProviders\AIProvidersList;
 use Piwik\Plugins\AIProviders\AIRequest;
 use Piwik\Plugins\AIProviders\API;
 use Piwik\Plugins\AIProviders\AIProviderService;
+use Piwik\Plugins\AIProviders\Controller;
 use Piwik\Plugins\AIProviders\Model\Configuration;
+use Piwik\Plugins\AIProviders\Provider\OpenAI;
 use Piwik\Tests\Framework\Fixture;
 use Piwik\Tests\Framework\Mock\FakeAccess;
 use Piwik\Tests\Framework\TestCase\IntegrationTestCase;
@@ -235,6 +238,47 @@ class ConfigurationTest extends IntegrationTestCase
         );
     }
 
+    public function testJsonResponseModeAsksProviderForJsonAndDecodesIt(): void
+    {
+        $this->api->saveSettings(
+            'openai',
+            Configuration::CAPABILITY_INSTANT,
+            (string) json_encode([
+                'openai' => [
+                    'apiKey' => 'secret-openai-key',
+                    'endpointUrl' => '',
+                ],
+            ])
+        );
+
+        $capturedBody = null;
+        Piwik::addAction('Http.sendHttpRequest', function (
+            string $url,
+            array $httpEventParams,
+            ?string &$response,
+            ?int &$status,
+            array &$headers
+        ) use (&$capturedBody): void {
+            $capturedBody = json_decode((string) $httpEventParams['body'], true);
+            $response = (string) json_encode([
+                'choices' => [['message' => ['content' => '{"goals":[]}']]],
+            ]);
+            $status = 200;
+            $headers = ['Content-Type' => 'application/json'];
+        });
+
+        $response = StaticContainer::get(AIProviderService::class)
+            ->complete((new AIRequest('Recommend goals for this site', 'Goals'))->withJsonResponse());
+
+        // The provider is asked for JSON natively …
+        $this->assertSame(['type' => 'json_object'], $capturedBody['response_format']);
+        // … and via a system instruction that mentions JSON (required by some providers).
+        $this->assertSame('system', $capturedBody['messages'][0]['role']);
+        $this->assertStringContainsString('JSON', $capturedBody['messages'][0]['content']);
+        // The response exposes the decoded object.
+        $this->assertSame(['goals' => []], $response->getJsonData());
+    }
+
     public function testServiceUsesForcedProviderAndIgnoresRequestedProvider(): void
     {
         $this->api->saveSettings(
@@ -267,6 +311,28 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertSame('openai', $settings['defaultProviderId']);
         $this->assertFalse($settings['canEditProviderConfiguration']);
         $this->assertFalse($settings['canEditCapabilityLevel']);
+    }
+
+    public function testManagedModeMakesSettingsPageUnavailable(): void
+    {
+        Config::getInstance()->AIProviders = ['defaultProvider' => 'openai'];
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('managed');
+
+        (new Controller())->index();
+    }
+
+    public function testProvidersCannotBeOverwritten(): void
+    {
+        $providers = new AIProvidersList();
+        $first = new OpenAI();
+
+        $providers->addProvider($first);
+        $providers->addProvider(new OpenAI());
+
+        $this->assertCount(1, $providers->getProviders());
+        $this->assertSame($first, $providers->getProvider('openai'));
     }
 
     public function testApiTestsConnectionWithUnsavedProviderConfiguration(): void

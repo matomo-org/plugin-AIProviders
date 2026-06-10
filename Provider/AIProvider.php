@@ -1,7 +1,7 @@
 <?php
 
 /**
-Ca * Matomo - free/libre analytics platform
+ * Matomo - free/libre analytics platform
  *
  * @link    https://matomo.org
  * @license https://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
@@ -20,6 +20,8 @@ use RuntimeException;
 abstract class AIProvider
 {
     private const TRANSIENT_ERROR_RETRY_DELAYS = [1, 2];
+
+    private const JSON_RESPONSE_INSTRUCTION = 'Respond with a single valid JSON object and nothing else. Do not wrap it in Markdown code fences.';
 
     /**
      * @var string
@@ -120,7 +122,32 @@ abstract class AIProvider
     {
         $model = $request->getModel();
 
+        // TODO: Map capability levels to provider-specific models once the
+        // model choices are confirmed. Callers can still override the model
+        // explicitly per request for now.
         return $model !== null && $model !== '' ? $model : $this->getDefaultModel();
+    }
+
+    /**
+     * Returns the system prompt for the request, augmented with a JSON-output
+     * instruction when JSON mode is requested. Providers should use this rather
+     * than reading the request's system prompt directly, so JSON mode works even
+     * for providers without a native JSON option (and so the word "JSON" is
+     * present, which some providers require to enable their JSON mode).
+     */
+    protected function getSystemPrompt(AIRequest $request): ?string
+    {
+        $systemPrompt = $request->getSystemPrompt();
+
+        if (!$request->isJsonResponse()) {
+            return $systemPrompt;
+        }
+
+        if ($systemPrompt === null || trim($systemPrompt) === '') {
+            return self::JSON_RESPONSE_INSTRUCTION;
+        }
+
+        return rtrim($systemPrompt) . "\n\n" . self::JSON_RESPONSE_INSTRUCTION;
     }
 
     /**
@@ -156,20 +183,27 @@ abstract class AIProvider
     {
         $messages = [];
 
-        if ($request->getSystemPrompt() !== null && $request->getSystemPrompt() !== '') {
-            $messages[] = ['role' => 'system', 'content' => $request->getSystemPrompt()];
+        $systemPrompt = $this->getSystemPrompt($request);
+        if ($systemPrompt !== null && $systemPrompt !== '') {
+            $messages[] = ['role' => 'system', 'content' => $systemPrompt];
         }
 
         $messages[] = ['role' => 'user', 'content' => $request->getUserPrompt()];
 
         $model = $this->resolveModel($request);
 
-        $response = $this->sendJsonRequest($endpointUrl, $headers, [
+        $payload = [
             'model' => $model,
             'messages' => $messages,
             'max_tokens' => $request->getMaxTokens(),
             'temperature' => $request->getTemperature(),
-        ]);
+        ];
+
+        if ($request->isJsonResponse()) {
+            $payload['response_format'] = ['type' => 'json_object'];
+        }
+
+        $response = $this->sendJsonRequest($endpointUrl, $headers, $payload);
 
         $text = $response['choices'][0]['message']['content'] ?? '';
 

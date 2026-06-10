@@ -71,11 +71,22 @@ class AIProviderService
         $response = $this->runWithProvider($provider, $configuration, $request);
 
         /**
-         * TODO: record usage telemetry here once a usage-logging table exists.
-         * Everything needed is already available: $request->getCallerPluginName(),
-         * $request->getFeatureKey(), $request->getIdSite(), $provider->getId(),
-         * and the token counts on $response (getInputTokens()/getOutputTokens()).
-         * Telemetry is not implemented yet.
+         * TODO: publish an observability event here so billing or monitoring can
+         * hook into AI usage without this plugin depending on them. Emit basic
+         * data, for example:
+         *
+         *     Piwik::postEvent('AIProviders.usage', [[
+         *         'caller'    => $request->getCallerPluginName(),
+         *         'feature'   => $request->getFeatureKey(),
+         *         'idSite'    => $request->getIdSite(),
+         *         'login'     => Piwik::getCurrentUserLogin(),
+         *         'provider'  => $provider->getId(),
+         *         'model'     => $response->getModel(),
+         *         'tokensIn'  => $response->getInputTokens(),
+         *         'tokensOut' => $response->getOutputTokens(),
+         *     ]]);
+         *
+         * Not implemented yet.
          */
         return $response;
     }

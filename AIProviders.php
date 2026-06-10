@@ -27,9 +27,11 @@ class AIProviders extends Plugin
     /**
      * Registers the built-in AI providers.
      *
-     * Overriding an existing provider ID is currently allowed (the override is
-     * logged in {@link AIProvidersList::addProvider()}). TODO: decide whether
-     * built-in provider IDs should be protected from being overridden.
+     * Provider IDs are unique and cannot be overwritten: the first registration
+     * for an ID wins (see {@link AIProvidersList::addProvider()}). This protects
+     * the built-in providers, and a provider that is centrally forced in a
+     * managed environment such as Matomo Cloud, from being shadowed by another
+     * plugin.
      */
     public function addAIProviders(AIProvidersList $providers): void
     {

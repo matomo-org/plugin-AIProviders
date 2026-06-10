@@ -354,7 +354,7 @@ class Configuration
      * Returns whether the plugin runs in a managed environment, that is, the
      * default provider is forced (and locked) from configuration.
      */
-    private function isManaged(): bool
+    public function isManaged(): bool
     {
         return !$this->defaultProvider->isWritableByCurrentUser();
     }

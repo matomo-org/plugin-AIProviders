@@ -11,14 +11,25 @@ declare(strict_types=1);
 
 namespace Piwik\Plugins\AIProviders;
 
+use Piwik\Container\StaticContainer;
 use Piwik\Menu\MenuAdmin;
 use Piwik\Piwik;
+use Piwik\Plugins\AIProviders\Model\Configuration;
 
 class Menu extends \Piwik\Plugin\Menu
 {
     public function configureAdminMenu(MenuAdmin $menu): void
     {
         if (!Piwik::hasUserSuperUserAccess()) {
+            return;
+        }
+
+        /**
+         * In a managed environment (for example Matomo Cloud) the provider is
+         * forced from configuration and there is nothing to configure, so the
+         * settings page is hidden entirely.
+         */
+        if (StaticContainer::get(Configuration::class)->isManaged()) {
             return;
         }
 
