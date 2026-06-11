@@ -23,7 +23,7 @@ class Controller extends ControllerAdmin
         Piwik::checkUserHasSuperUserAccess();
 
         /**
-         * In a managed environment (for example Matomo Cloud) the provider is
+         * In a managed environment the provider is
          * forced from configuration and there is nothing to configure, so the
          * settings page is intentionally unavailable (the menu entry is hidden
          * too). This guards against direct URL access.

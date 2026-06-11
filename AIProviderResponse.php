@@ -49,13 +49,49 @@ class AIProviderResponse
      */
     private $outputTokens;
 
+    /**
+     * Decoded provider response, retained for trusted server-side callers that
+     * need to persist or re-parse provider-specific payloads.
+     *
+     * @var array<string, mixed>|null
+     */
+    private $rawResponse;
+
+    /**
+     * Provider reasoning level that was actually applied.
+     *
+     * @var string
+     */
+    private $reasoningLevel;
+
+    /**
+     * Whether provider-side web search was actually applied.
+     *
+     * @var bool
+     */
+    private $webSearchEnabled;
+
+    /**
+     * Total provider request time in milliseconds, including retries.
+     *
+     * @var int|null
+     */
+    private $executionTimeMs;
+
+    /**
+     * @param array<string, mixed>|null $rawResponse
+     */
     public function __construct(
         string $providerId,
         string $providerName,
         string $model,
         string $text,
         ?int $inputTokens = null,
-        ?int $outputTokens = null
+        ?int $outputTokens = null,
+        ?array $rawResponse = null,
+        string $reasoningLevel = AIRequest::REASONING_NONE,
+        bool $webSearchEnabled = false,
+        ?int $executionTimeMs = null
     ) {
         $this->providerId = $providerId;
         $this->providerName = $providerName;
@@ -63,6 +99,10 @@ class AIProviderResponse
         $this->text = $text;
         $this->inputTokens = $inputTokens;
         $this->outputTokens = $outputTokens;
+        $this->rawResponse = $rawResponse;
+        $this->reasoningLevel = $reasoningLevel;
+        $this->webSearchEnabled = $webSearchEnabled;
+        $this->executionTimeMs = $executionTimeMs;
     }
 
     public function getText(): string
@@ -83,6 +123,29 @@ class AIProviderResponse
     public function getOutputTokens(): ?int
     {
         return $this->outputTokens;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getRawResponse(): ?array
+    {
+        return $this->rawResponse;
+    }
+
+    public function getReasoningLevel(): string
+    {
+        return $this->reasoningLevel;
+    }
+
+    public function isWebSearchEnabled(): bool
+    {
+        return $this->webSearchEnabled;
+    }
+
+    public function getExecutionTimeMs(): ?int
+    {
+        return $this->executionTimeMs;
     }
 
     /**
@@ -111,6 +174,10 @@ class AIProviderResponse
             'text' => $this->text,
             'inputTokens' => $this->inputTokens,
             'outputTokens' => $this->outputTokens,
+            'rawResponse' => $this->rawResponse,
+            'reasoningLevel' => $this->reasoningLevel,
+            'webSearchEnabled' => $this->webSearchEnabled,
+            'executionTimeMs' => $this->executionTimeMs,
         ];
     }
 }

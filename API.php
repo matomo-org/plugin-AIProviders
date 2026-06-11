@@ -46,7 +46,7 @@ class API extends PluginAPI
      * Saves AI provider settings from the administration UI.
      *
      * API keys should be submitted as POST data and are never returned by this
-     * API. In a managed environment (for example Matomo Cloud) the provider is
+     * API. In a managed environment the provider is
      * forced from configuration, so the submitted default provider, credentials,
      * and capability level are all ignored.
      *
@@ -94,7 +94,7 @@ class API extends PluginAPI
         Piwik::checkUserHasSuperUserAccess();
 
         $providers = AIProviders::getAvailableProviders();
-        $provider = $this->getProvider($providers->getProvider($providerId), $providerId);
+        $provider = $this->getSelectableProvider($providers, $providerId);
         $configuration = $this->getConfiguration()->getProviderConfigurationForUse(
             $provider,
             $this->decodeProviderConfiguration($providerConfiguration)
@@ -121,7 +121,7 @@ class API extends PluginAPI
         Piwik::checkUserHasSuperUserAccess();
 
         $providers = AIProviders::getAvailableProviders();
-        $this->getProvider($providers->getProvider($providerId), $providerId);
+        $this->getSelectableProvider($providers, $providerId);
 
         $configuration = $this->getConfiguration();
         $configuration->removeProviderConfiguration($providerId);
@@ -139,9 +139,17 @@ class API extends PluginAPI
         return StaticContainer::get(AIProviderService::class);
     }
 
-    private function getProvider(?AIProvider $provider, string $providerId): AIProvider
+    /**
+     * Resolves a provider for the administration endpoints. Restricted
+     * providers (registered as non-selectable by a managed environment) are
+     * reported as unknown on purpose, so admin surfaces neither reveal nor
+     * operate on them.
+     */
+    private function getSelectableProvider(AIProvidersList $providers, string $providerId): AIProvider
     {
-        if ($provider === null) {
+        $provider = $providers->getProvider($providerId);
+
+        if ($provider === null || !$providers->isSelectable($providerId)) {
             throw new \InvalidArgumentException(sprintf('Unknown AI provider "%s".', $providerId));
         }
 

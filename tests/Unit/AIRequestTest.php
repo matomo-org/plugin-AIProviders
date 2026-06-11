@@ -33,6 +33,9 @@ class AIRequestTest extends UnitTestCase
         $this->assertNull($request->getIdSite());
         $this->assertSame(AIRequest::DEFAULT_MAX_TOKENS, $request->getMaxTokens());
         $this->assertSame(AIRequest::DEFAULT_TEMPERATURE, $request->getTemperature());
+        $this->assertSame(AIRequest::REASONING_NONE, $request->getReasoningLevel());
+        $this->assertFalse($request->isWebSearchEnabled());
+        $this->assertNull($request->getThinkingBudget());
     }
 
     public function testWithMethodsReturnImmutableCopies(): void
@@ -47,7 +50,10 @@ class AIRequestTest extends UnitTestCase
             ->withFeatureKey('goal-recommendation')
             ->withIdSite(3)
             ->withMaxTokens(256)
-            ->withTemperature(0.7);
+            ->withTemperature(0.7)
+            ->withReasoningLevel('low')
+            ->withWebSearchEnabled(true)
+            ->withThinkingBudget(128);
 
         // The original request is unchanged.
         $this->assertNull($request->getSystemPrompt());
@@ -63,5 +69,8 @@ class AIRequestTest extends UnitTestCase
         $this->assertSame(3, $modified->getIdSite());
         $this->assertSame(256, $modified->getMaxTokens());
         $this->assertSame(0.7, $modified->getTemperature());
+        $this->assertSame('low', $modified->getReasoningLevel());
+        $this->assertTrue($modified->isWebSearchEnabled());
+        $this->assertSame(128, $modified->getThinkingBudget());
     }
 }

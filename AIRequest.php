@@ -27,13 +27,28 @@ namespace Piwik\Plugins\AIProviders;
  *     );
  *
  * The selected `providerId` is treated as a hint: on a managed environment
- * (for example Matomo Cloud) it may be overridden by the forced default
- * provider. See {@link AIProviderService::complete()}.
+ * it is overridden by the forced default provider,
+ * unless the caller plugin is on the centrally managed
+ * `[AIProviders] providerSelectionAllowlist`, in which case the requested
+ * provider and model are honoured. See {@link AIProviderService::complete()}.
+ *
+ * **Hard rule:** the values passed to {@link withProviderId()} and
+ * {@link withModel()} must originate from plugin code constants or
+ * server-side configuration — never, directly or indirectly, from request
+ * input (`Request::fromRequest()`, `Common::getRequestVar()`, superglobals).
+ * Forwarding request input would let any API/HTTP client pick the provider
+ * and model the server calls, which on managed hosting means circumventing
+ * the centrally managed provider and its cost controls. If users may choose
+ * between engines in a UI, the request parameter must be a key into a
+ * server-side map defined by the plugin, never the provider/model string
+ * itself.
  */
 class AIRequest
 {
     public const DEFAULT_MAX_TOKENS = 1024;
     public const DEFAULT_TEMPERATURE = 0.2;
+
+    public const REASONING_NONE = 'none';
 
     public const FORMAT_TEXT = 'text';
     public const FORMAT_JSON = 'json';
@@ -106,6 +121,30 @@ class AIRequest
      */
     private $responseFormat = self::FORMAT_TEXT;
 
+    /**
+     * Requested reasoning level. Currently advisory only; providers do not send
+     * provider-specific reasoning controls until those request formats are
+     * confirmed.
+     *
+     * @var string
+     */
+    private $reasoningLevel = self::REASONING_NONE;
+
+    /**
+     * Whether the caller wants provider web search. Currently advisory only;
+     * providers do not enable provider-specific web search tools yet.
+     *
+     * @var bool
+     */
+    private $webSearchEnabled = false;
+
+    /**
+     * Future provider-specific thinking budget. Not applied to requests yet.
+     *
+     * @var int|null
+     */
+    private $thinkingBudget = null;
+
     public function __construct(string $userPrompt, string $callerPluginName)
     {
         $this->userPrompt = $userPrompt;
@@ -120,6 +159,14 @@ class AIRequest
         return $request;
     }
 
+    /**
+     * Requests a specific provider. Honoured on unmanaged instances and for
+     * allowlisted caller plugins on managed instances; otherwise the forced
+     * default provider wins (see the class docblock).
+     *
+     * The value must be a plugin constant or server-side config value, never
+     * request input — see the hard rule in the class docblock.
+     */
     public function withProviderId(?string $providerId): self
     {
         $request = clone $this;
@@ -128,6 +175,13 @@ class AIRequest
         return $request;
     }
 
+    /**
+     * Requests a specific model. Stripped on managed instances unless the
+     * caller plugin is allowlisted, because the model decides cost there.
+     *
+     * The value must be a plugin constant or server-side config value, never
+     * request input — see the hard rule in the class docblock.
+     */
     public function withModel(?string $model): self
     {
         $request = clone $this;
@@ -172,6 +226,31 @@ class AIRequest
     {
         $request = clone $this;
         $request->temperature = $temperature;
+
+        return $request;
+    }
+
+    public function withReasoningLevel(?string $reasoningLevel): self
+    {
+        $request = clone $this;
+        $reasoningLevel = trim((string) $reasoningLevel);
+        $request->reasoningLevel = $reasoningLevel !== '' ? $reasoningLevel : self::REASONING_NONE;
+
+        return $request;
+    }
+
+    public function withWebSearchEnabled(bool $webSearchEnabled): self
+    {
+        $request = clone $this;
+        $request->webSearchEnabled = $webSearchEnabled;
+
+        return $request;
+    }
+
+    public function withThinkingBudget(?int $thinkingBudget): self
+    {
+        $request = clone $this;
+        $request->thinkingBudget = $thinkingBudget;
 
         return $request;
     }
@@ -241,6 +320,21 @@ class AIRequest
     public function getResponseFormat(): string
     {
         return $this->responseFormat;
+    }
+
+    public function getReasoningLevel(): string
+    {
+        return $this->reasoningLevel;
+    }
+
+    public function isWebSearchEnabled(): bool
+    {
+        return $this->webSearchEnabled;
+    }
+
+    public function getThinkingBudget(): ?int
+    {
+        return $this->thinkingBudget;
     }
 
     public function isJsonResponse(): bool

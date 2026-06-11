@@ -15,6 +15,21 @@ use Piwik\Container\StaticContainer;
 use Piwik\Plugins\AIProviders\Provider\AIProvider;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Registry of the AI providers registered by active plugins.
+ *
+ * Providers come in two flavours:
+ *
+ * - **Selectable** providers (the default) are offered to super users in the
+ *   administration UI and are eligible to become the instance-wide default
+ *   provider.
+ * - **Restricted** (non-selectable) providers stay registered and can serve
+ *   completions, but are hidden from every admin surface and can never become
+ *   the default. A managed environment uses this to keep the
+ *   basic providers available for plugins that are allowed to target a
+ *   specific provider (see {@link AIProviderService::complete()}) while only
+ *   offering the managed provider to users.
+ */
 class AIProvidersList
 {
     /**
@@ -22,7 +37,14 @@ class AIProvidersList
      */
     private $providers = [];
 
-    public function addProvider(AIProvider $provider): void
+    /**
+     * Selectable flag per provider ID, see the class docblock.
+     *
+     * @var array<string, bool>
+     */
+    private $selectable = [];
+
+    public function addProvider(AIProvider $provider, bool $selectable = true): void
     {
         $providerId = $provider->getId();
 
@@ -31,9 +53,11 @@ class AIProvidersList
              * Provider IDs are unique and cannot be overwritten: the first
              * registration for a given ID wins and later registrations are
              * ignored. This protects the built-in providers (and a provider that
-             * is centrally forced in a managed multi-tenant environment such as
-             * Matomo Cloud) from being shadowed by another plugin. The ignored
-             * registration is logged so the collision is visible.
+             * is centrally forced in a managed multi-tenant environment) from
+             * being shadowed by another plugin.
+             * The selectable flag of the first registration is kept for the
+             * same reason. The ignored registration is logged so the collision
+             * is visible.
              */
             StaticContainer::get(LoggerInterface::class)->warning(
                 'AI provider "{id}" is already registered as {existing}; ignoring duplicate registration of {ignored}.',
@@ -48,11 +72,32 @@ class AIProvidersList
         }
 
         $this->providers[$providerId] = $provider;
+        $this->selectable[$providerId] = $selectable;
     }
 
     public function removeProvider(string $providerId): void
     {
-        unset($this->providers[$providerId]);
+        unset($this->providers[$providerId], $this->selectable[$providerId]);
+    }
+
+    /**
+     * Marks a registered provider as selectable or restricted. Intended for
+     * `AIProviders.filterAIProviders` subscribers; unknown IDs are ignored.
+     */
+    public function setSelectable(string $providerId, bool $selectable): void
+    {
+        if (isset($this->providers[$providerId])) {
+            $this->selectable[$providerId] = $selectable;
+        }
+    }
+
+    /**
+     * Returns whether the provider may be offered in the administration UI and
+     * used as the default provider. Unknown providers are not selectable.
+     */
+    public function isSelectable(string $providerId): bool
+    {
+        return $this->selectable[$providerId] ?? false;
     }
 
     public function hasProvider(string $providerId): bool
@@ -66,10 +111,31 @@ class AIProvidersList
     }
 
     /**
+     * Returns all registered providers, including restricted ones. Completion
+     * requests resolve against this list; admin surfaces must use
+     * {@link getSelectableProviders()} instead so restricted providers stay
+     * hidden.
+     *
      * @return array<int, AIProvider>
      */
     public function getProviders(): array
     {
         return array_values($this->providers);
+    }
+
+    /**
+     * Returns the providers that may be shown in the administration UI and
+     * chosen as the default provider.
+     *
+     * @return array<int, AIProvider>
+     */
+    public function getSelectableProviders(): array
+    {
+        return array_values(array_filter(
+            $this->providers,
+            function (AIProvider $provider): bool {
+                return $this->isSelectable($provider->getId());
+            }
+        ));
     }
 }

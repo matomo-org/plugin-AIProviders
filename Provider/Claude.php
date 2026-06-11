@@ -71,10 +71,12 @@ class Claude extends AIProvider
         $text = $response['content'][0]['text'] ?? '';
 
         return $this->buildResponse(
+            $request,
             $model,
             is_string($text) ? $text : '',
             isset($response['usage']['input_tokens']) ? (int) $response['usage']['input_tokens'] : null,
-            isset($response['usage']['output_tokens']) ? (int) $response['usage']['output_tokens'] : null
+            isset($response['usage']['output_tokens']) ? (int) $response['usage']['output_tokens'] : null,
+            $response
         );
     }
 }

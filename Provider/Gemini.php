@@ -84,10 +84,12 @@ class Gemini extends AIProvider
         $text = $response['candidates'][0]['content']['parts'][0]['text'] ?? '';
 
         return $this->buildResponse(
+            $request,
             $model,
             is_string($text) ? $text : '',
             isset($response['usageMetadata']['promptTokenCount']) ? (int) $response['usageMetadata']['promptTokenCount'] : null,
-            isset($response['usageMetadata']['candidatesTokenCount']) ? (int) $response['usageMetadata']['candidatesTokenCount'] : null
+            isset($response['usageMetadata']['candidatesTokenCount']) ? (int) $response['usageMetadata']['candidatesTokenCount'] : null,
+            $response
         );
     }
 

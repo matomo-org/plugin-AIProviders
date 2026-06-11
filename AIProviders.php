@@ -30,8 +30,7 @@ class AIProviders extends Plugin
      * Provider IDs are unique and cannot be overwritten: the first registration
      * for an ID wins (see {@link AIProvidersList::addProvider()}). This protects
      * the built-in providers, and a provider that is centrally forced in a
-     * managed environment such as Matomo Cloud, from being shadowed by another
-     * plugin.
+     * managed environment, from being shadowed by another plugin.
      */
     public function addAIProviders(AIProvidersList $providers): void
     {
@@ -73,6 +72,11 @@ class AIProviders extends Plugin
         /**
          * Triggered after providers have been registered, so plugins can remove
          * or adjust providers before they are shown or used.
+         *
+         * A managed environment that wants providers hidden from users but
+         * still available to allowlisted plugins should demote them with
+         * `$providers->setSelectable($id, false)` instead of removing them
+         * (see {@link AIProvidersList}).
          *
          * @param AIProvidersList $providers Provider registry to mutate.
          */

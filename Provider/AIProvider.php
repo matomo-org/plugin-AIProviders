@@ -43,6 +43,11 @@ abstract class AIProvider
      */
     private $supportsCustomEndpoint;
 
+    /**
+     * @var int|null
+     */
+    private $lastRequestExecutionTimeMs = null;
+
     public function __construct(
         string $id,
         string $name,
@@ -153,12 +158,15 @@ abstract class AIProvider
     /**
      * @param int|null $inputTokens  Prompt tokens reported by the provider, if any.
      * @param int|null $outputTokens Completion tokens reported by the provider, if any.
+     * @param array<string, mixed>|null $rawResponse Decoded provider response, if available.
      */
     protected function buildResponse(
+        AIRequest $request,
         string $model,
         string $text,
         ?int $inputTokens = null,
-        ?int $outputTokens = null
+        ?int $outputTokens = null,
+        ?array $rawResponse = null
     ): AIProviderResponse {
         return new AIProviderResponse(
             $this->getId(),
@@ -166,8 +174,27 @@ abstract class AIProvider
             $model,
             trim($text),
             $inputTokens,
-            $outputTokens
+            $outputTokens,
+            $rawResponse,
+            $this->getReasoningLevelUsed($request),
+            $this->isWebSearchUsed($request),
+            $this->lastRequestExecutionTimeMs
         );
+    }
+
+    protected function getReasoningLevelUsed(AIRequest $request): string
+    {
+        // TODO: Map AIRequest::getReasoningLevel() and getThinkingBudget() to
+        // provider-specific request fields once the supported models/formats
+        // are confirmed.
+        return AIRequest::REASONING_NONE;
+    }
+
+    protected function isWebSearchUsed(AIRequest $request): bool
+    {
+        // TODO: Implement provider-specific web search/tool configuration for
+        // OpenAI, Gemini, Claude, and managed providers separately.
+        return false;
     }
 
     /**
@@ -208,10 +235,12 @@ abstract class AIProvider
         $text = $response['choices'][0]['message']['content'] ?? '';
 
         return $this->buildResponse(
+            $request,
             $model,
             is_string($text) ? $text : '',
             isset($response['usage']['prompt_tokens']) ? (int) $response['usage']['prompt_tokens'] : null,
-            isset($response['usage']['completion_tokens']) ? (int) $response['usage']['completion_tokens'] : null
+            isset($response['usage']['completion_tokens']) ? (int) $response['usage']['completion_tokens'] : null,
+            $response
         );
     }
 
@@ -300,6 +329,7 @@ abstract class AIProvider
         }
 
         $retryDelays = self::TRANSIENT_ERROR_RETRY_DELAYS;
+        $startedAt = microtime(true);
 
         for ($attempt = 0; $attempt <= count($retryDelays); $attempt++) {
             try {
@@ -341,6 +371,8 @@ abstract class AIProvider
                 if (!is_array($decoded)) {
                     throw new RuntimeException(sprintf('%s returned invalid JSON.', $this->getName()));
                 }
+
+                $this->lastRequestExecutionTimeMs = (int) round((microtime(true) - $startedAt) * 1000);
 
                 return $decoded;
             }

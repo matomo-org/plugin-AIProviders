@@ -41,9 +41,21 @@ class AIProviderService
      * Completes the given request.
      *
      * The provider is resolved in this order: the provider forced by a managed
-     * environment (for example Matomo Cloud), then the provider requested by
-     * the caller, then the configured default provider. This means a managed
-     * environment always wins, even when the caller requests another provider.
+     * environment, then the provider requested by
+     * the caller, then the configured default provider. A managed environment
+     * wins even when the caller requests another provider, except for callers
+     * on the `providerSelectionAllowlist` of the managed config, whose
+     * requested provider and model are honoured (see below).
+     *
+     * Allowlisted callers (for example a plugin that must query several AI
+     * engines because comparing the engines is the feature itself) get no
+     * silent fallback: an unknown requested provider throws, and an
+     * unconfigured one fails in the provider. Falling back to the forced
+     * provider would silently produce answers from the wrong engine, which is
+     * worse than a clear error.
+     *
+     * The requested model is forwarded for allowlisted callers and on
+     * unmanaged instances, and stripped otherwise.
      */
     public function complete(AIRequest $request): AIProviderResponse
     {
@@ -51,10 +63,18 @@ class AIProviderService
 
         $forcedProviderId = $this->configuration->getForcedProviderId();
         $requestedProviderId = $request->getProviderId();
+        $hasRequestedProvider = $requestedProviderId !== null && $requestedProviderId !== '';
 
-        if ($forcedProviderId !== null) {
+        if ($forcedProviderId !== null && $hasRequestedProvider && $this->isCallerAllowedToSelectProvider($request)) {
+            // TODO: consider validating the requested model against a
+            // per-provider `allowedModels` list from the managed config as a
+            // cost backstop, once the planned `AIProviders.usage` event (see
+            // below) shows whether actual token usage needs it.
+            $providerId = $requestedProviderId;
+        } elseif ($forcedProviderId !== null) {
             $providerId = $forcedProviderId;
-        } elseif ($requestedProviderId !== null && $requestedProviderId !== '') {
+            $request = $request->withProviderId($forcedProviderId)->withModel(null);
+        } elseif ($hasRequestedProvider) {
             $providerId = $requestedProviderId;
         } else {
             $providerId = $this->configuration->getDefaultProviderId($providers);
@@ -89,6 +109,18 @@ class AIProviderService
          * Not implemented yet.
          */
         return $response;
+    }
+
+    /**
+     * Returns whether the request's caller plugin may pick the provider even
+     * though a managed environment forces the default. The caller name on the
+     * request is self-declared; see
+     * {@link Configuration::isPluginAllowedToSelectProvider()} for why this is
+     * a policy gate, not a sandbox.
+     */
+    private function isCallerAllowedToSelectProvider(AIRequest $request): bool
+    {
+        return $this->configuration->isPluginAllowedToSelectProvider($request->getCallerPluginName());
     }
 
     /**
@@ -144,21 +176,6 @@ class AIProviderService
     }
 
     /**
-     * Returns the server-side connection config for the default provider.
-     *
-     * The returned array may include secrets and must not be exposed in API
-     * responses, logs, or browser-rendered output.
-     *
-     * @return array<string, string>
-     */
-    public function getDefaultProviderConfiguration(): array
-    {
-        $provider = $this->getDefaultProvider();
-
-        return $this->configuration->getProviderConfiguration($provider->getId());
-    }
-
-    /**
      * Returns the configured default model capability level.
      */
     public function getDefaultCapabilityLevel(): string
@@ -168,6 +185,10 @@ class AIProviderService
 
     /**
      * Returns provider status metadata for trusted PHP callers.
+     *
+     * Restricted providers (registered as non-selectable by a managed
+     * environment) are excluded so they stay invisible outside the
+     * allowlisted completion flow.
      *
      * @return array<int, array{
      *     id: string,
@@ -197,8 +218,8 @@ class AIProviderService
                 'isDefault' => $provider->getId() === $defaultProviderId,
                 'isConfigured' => $provider->isConfigured($configuration),
                 'supportsCustomEndpoint' => $provider->supportsCustomEndpoint(),
-                'endpointUrl' => $configuration['endpointUrl'] ?? '',
+                'endpointUrl' => $configuration['endpointUrl'],
             ];
-        }, $providers->getProviders());
+        }, $providers->getSelectableProviders());
     }
 }

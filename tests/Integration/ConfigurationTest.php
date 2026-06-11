@@ -57,6 +57,7 @@ class ConfigurationTest extends IntegrationTestCase
     public function tearDown(): void
     {
         Config::getInstance()->AIProviders = [];
+        putenv('MATOMO_AIPROVIDERS_OPENAI_API_KEY');
 
         parent::tearDown();
     }
@@ -161,7 +162,11 @@ class ConfigurationTest extends IntegrationTestCase
 
         $this->assertSame('claude', $service->getDefaultProvider()->getId());
         $this->assertSame(Configuration::CAPABILITY_THINKING, $service->getDefaultCapabilityLevel());
-        $this->assertSame('secret-claude-key', $service->getDefaultProviderConfiguration()['apiKey']);
+        // The stored credentials stay internal to the plugin; the service does
+        // not expose them. They are only resolvable through the Configuration.
+        $configuration = StaticContainer::get(Configuration::class);
+        $this->assertSame('secret-claude-key', $configuration->getProviderConfiguration('claude')['apiKey']);
+        $this->assertFalse(method_exists($service, 'getDefaultProviderConfiguration'));
     }
 
     public function testServiceCompletesRequestUsingConfiguredDefaultProvider(): void
@@ -185,6 +190,12 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertSame('Because molecules scatter blue light more strongly.', $response->getText());
         $this->assertSame(12, $response->getInputTokens());
         $this->assertSame(7, $response->getOutputTokens());
+        $rawResponse = $response->getRawResponse();
+        $this->assertIsArray($rawResponse);
+        $this->assertSame(12, $rawResponse['usage']['prompt_tokens']);
+        $this->assertSame(AIRequest::REASONING_NONE, $response->getReasoningLevel());
+        $this->assertFalse($response->isWebSearchEnabled());
+        $this->assertIsInt($response->getExecutionTimeMs());
     }
 
     public function testRequestForwardsSystemPromptModelAndOptionsToProvider(): void
@@ -220,11 +231,15 @@ class ConfigurationTest extends IntegrationTestCase
             ->withSystemPrompt('You are concise.')
             ->withModel('gpt-4o-mini')
             ->withMaxTokens(64)
-            ->withTemperature(0.5);
+            ->withTemperature(0.5)
+            ->withReasoningLevel('low')
+            ->withWebSearchEnabled(true);
 
         $response = StaticContainer::get(AIProviderService::class)->complete($request);
 
         $this->assertSame('Blue light scatters most.', $response->getText());
+        $this->assertSame(AIRequest::REASONING_NONE, $response->getReasoningLevel());
+        $this->assertFalse($response->isWebSearchEnabled());
         $this->assertIsArray($capturedBody);
         $this->assertSame('gpt-4o-mini', $capturedBody['model']);
         $this->assertSame(64, $capturedBody['max_tokens']);
@@ -300,6 +315,296 @@ class ConfigurationTest extends IntegrationTestCase
             ->complete((new AIRequest('why is the sky blue', 'Test'))->withProviderId('claude'));
 
         $this->assertSame('openai', $response->toArray()['providerId']);
+    }
+
+    public function testServiceIgnoresRequestedModelWhenProviderIsForced(): void
+    {
+        $this->api->saveSettings(
+            'openai',
+            Configuration::CAPABILITY_INSTANT,
+            (string) json_encode([
+                'openai' => [
+                    'apiKey' => 'secret-openai-key',
+                    'endpointUrl' => '',
+                ],
+            ])
+        );
+
+        Config::getInstance()->AIProviders = ['defaultProvider' => 'openai'];
+
+        $capturedBody = null;
+        Piwik::addAction('Http.sendHttpRequest', function (
+            string $url,
+            array $httpEventParams,
+            ?string &$response,
+            ?int &$status,
+            array &$headers
+        ) use (&$capturedBody): void {
+            $capturedBody = json_decode((string) $httpEventParams['body'], true);
+            $response = (string) json_encode([
+                'choices' => [['message' => ['content' => 'Forced provider default model used.']]],
+            ]);
+            $status = 200;
+            $headers = ['Content-Type' => 'application/json'];
+        });
+
+        StaticContainer::get(AIProviderService::class)
+            ->complete((new AIRequest('why is the sky blue', 'Test'))->withModel('claude-haiku-4-5'));
+
+        $this->assertIsArray($capturedBody);
+        $this->assertSame('gpt-4.1-mini', $capturedBody['model']);
+    }
+
+    public function testAllowlistedCallerMaySelectProviderAndModelWhenProviderIsForced(): void
+    {
+        $this->saveOpenAiAndClaudeKeys();
+
+        Config::getInstance()->AIProviders = [
+            'defaultProvider' => 'openai',
+            'providerSelectionAllowlist' => ['ExamplePlugin'],
+        ];
+
+        $capturedUrl = null;
+        $capturedBody = null;
+        $this->mockClaudeResponse('Brand X is a well-known brand.', $capturedUrl, $capturedBody);
+
+        $response = StaticContainer::get(AIProviderService::class)->complete(
+            (new AIRequest('What do you know about brand X?', 'ExamplePlugin'))
+                ->withProviderId('claude')
+                ->withModel('claude-sonnet-4-5')
+        );
+
+        $this->assertSame('claude', $response->toArray()['providerId']);
+        $this->assertSame('https://api.anthropic.com/v1/messages', $capturedUrl);
+        $this->assertIsArray($capturedBody);
+        $this->assertSame('claude-sonnet-4-5', $capturedBody['model']);
+    }
+
+    public function testAllowlistOnlyAppliesToTheNamedCallerPlugin(): void
+    {
+        $this->saveOpenAiAndClaudeKeys();
+
+        Config::getInstance()->AIProviders = [
+            'defaultProvider' => 'openai',
+            'providerSelectionAllowlist' => ['ExamplePlugin'],
+        ];
+
+        // mockAIProviderResponse() asserts the OpenAI endpoint is called, so a
+        // request to Claude would fail this test.
+        $this->mockAIProviderResponse('Because molecules scatter blue light more strongly.');
+
+        $response = StaticContainer::get(AIProviderService::class)->complete(
+            (new AIRequest('why is the sky blue', 'Goals'))
+                ->withProviderId('claude')
+                ->withModel('claude-sonnet-4-5')
+        );
+
+        $this->assertSame('openai', $response->toArray()['providerId']);
+    }
+
+    public function testAllowlistedCallerRequestingUnknownProviderGetsClearError(): void
+    {
+        $this->saveOpenAiAndClaudeKeys();
+
+        Config::getInstance()->AIProviders = [
+            'defaultProvider' => 'openai',
+            'providerSelectionAllowlist' => ['ExamplePlugin'],
+        ];
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unknown AI provider "no-such-provider".');
+
+        StaticContainer::get(AIProviderService::class)->complete(
+            (new AIRequest('What do you know about brand X?', 'ExamplePlugin'))
+                ->withProviderId('no-such-provider')
+        );
+    }
+
+    public function testAllowlistedCallerRequestingUnconfiguredProviderFailsInsteadOfFallingBack(): void
+    {
+        // Only OpenAI is configured; Claude is requested. Falling back to the
+        // forced provider would silently answer from the wrong engine, so a
+        // clear error is expected instead.
+        $this->api->saveSettings(
+            'openai',
+            Configuration::CAPABILITY_INSTANT,
+            (string) json_encode([
+                'openai' => ['apiKey' => 'secret-openai-key', 'endpointUrl' => ''],
+            ])
+        );
+
+        Config::getInstance()->AIProviders = [
+            'defaultProvider' => 'openai',
+            'providerSelectionAllowlist' => ['ExamplePlugin'],
+        ];
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('No API key is configured for Claude.');
+
+        StaticContainer::get(AIProviderService::class)->complete(
+            (new AIRequest('What do you know about brand X?', 'ExamplePlugin'))
+                ->withProviderId('claude')
+        );
+    }
+
+    public function testConfigFileApiKeyMakesProviderUsableWithoutStoredCredentials(): void
+    {
+        Config::getInstance()->AIProviders = ['openaiApiKey' => 'config-openai-key'];
+
+        $this->mockAIProviderResponse('Because molecules scatter blue light more strongly.');
+
+        $response = StaticContainer::get(AIProviderService::class)
+            ->complete(new AIRequest('why is the sky blue', 'Test'));
+
+        $this->assertSame('openai', $response->toArray()['providerId']);
+    }
+
+    public function testConfigFileApiKeyWinsOverStoredApiKey(): void
+    {
+        $this->api->saveSettings(
+            'openai',
+            Configuration::CAPABILITY_INSTANT,
+            (string) json_encode([
+                'openai' => ['apiKey' => 'stored-db-key', 'endpointUrl' => ''],
+            ])
+        );
+
+        Config::getInstance()->AIProviders = ['openaiApiKey' => 'config-openai-key'];
+
+        $configuration = StaticContainer::get(Configuration::class);
+
+        $this->assertSame('config-openai-key', $configuration->getProviderConfiguration('openai')['apiKey']);
+    }
+
+    public function testEnvironmentVariableSuppliesApiKey(): void
+    {
+        putenv('MATOMO_AIPROVIDERS_OPENAI_API_KEY=env-openai-key');
+
+        $configuration = StaticContainer::get(Configuration::class);
+
+        $this->assertSame('env-openai-key', $configuration->getProviderConfiguration('openai')['apiKey']);
+
+        // The config file wins over the environment variable.
+        Config::getInstance()->AIProviders = ['openaiApiKey' => 'config-openai-key'];
+
+        $this->assertSame('config-openai-key', $configuration->getProviderConfiguration('openai')['apiKey']);
+    }
+
+    public function testManagedFlowServesAllowlistedPluginThroughRestrictedProviderWithConfigCredentials(): void
+    {
+        // Full managed-environment setup: a forced provider, restricted basic providers,
+        // config-file credentials, and an allowlisted plugin targeting one of
+        // the restricted providers.
+        Config::getInstance()->AIProviders = [
+            'defaultProvider' => 'openai',
+            'openaiApiKey' => 'config-openai-key',
+            'claudeApiKey' => 'config-claude-key',
+            'providerSelectionAllowlist' => ['ExamplePlugin'],
+        ];
+        $this->restrictSelectableProvidersTo('openai');
+
+        $capturedUrl = null;
+        $capturedBody = null;
+        $capturedHeaders = null;
+        $this->mockClaudeResponse('Brand X is a well-known brand.', $capturedUrl, $capturedBody, $capturedHeaders);
+
+        $response = StaticContainer::get(AIProviderService::class)->complete(
+            (new AIRequest('What do you know about brand X?', 'ExamplePlugin'))
+                ->withProviderId('claude')
+                ->withModel('claude-sonnet-4-5')
+        );
+
+        $this->assertSame('claude', $response->toArray()['providerId']);
+        $this->assertSame('Brand X is a well-known brand.', $response->getText());
+        $this->assertSame('https://api.anthropic.com/v1/messages', $capturedUrl);
+        $this->assertSame('claude-sonnet-4-5', $capturedBody['model']);
+        $this->assertContains('x-api-key: config-claude-key', $capturedHeaders);
+    }
+
+    public function testRestrictedProvidersAreHiddenFromAdminSurfaces(): void
+    {
+        $this->restrictSelectableProvidersTo('openai');
+
+        $settings = $this->api->getSettings();
+        $settingsProviderIds = array_column($settings['providers'], 'id');
+
+        $statuses = StaticContainer::get(AIProviderService::class)->getAvailableProviderStatuses();
+        $statusProviderIds = array_column($statuses, 'id');
+
+        $this->assertSame(['openai'], $settingsProviderIds);
+        $this->assertSame(['openai'], $statusProviderIds);
+    }
+
+    public function testRestrictedProviderCannotBeTested(): void
+    {
+        $this->restrictSelectableProvidersTo('openai');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unknown AI provider "claude".');
+
+        $this->api->testConnection(
+            'claude',
+            Common::sanitizeInputValue((string) json_encode([
+                'apiKey' => 'secret-claude-key',
+                'endpointUrl' => '',
+            ]))
+        );
+    }
+
+    public function testRestrictedProviderCannotBeDisconnected(): void
+    {
+        $this->restrictSelectableProvidersTo('openai');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unknown AI provider "claude".');
+
+        $this->api->disconnectProvider('claude');
+    }
+
+    public function testRestrictedProviderCannotBeSavedAsDefault(): void
+    {
+        $this->restrictSelectableProvidersTo('openai');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unknown AI provider "claude".');
+
+        $this->api->saveSettings(
+            'claude',
+            Configuration::CAPABILITY_INSTANT,
+            (string) json_encode([
+                'claude' => ['apiKey' => 'secret-claude-key', 'endpointUrl' => ''],
+            ])
+        );
+    }
+
+    public function testRestrictedProviderIsNotEligibleAsDefault(): void
+    {
+        $this->api->saveSettings(
+            'openai',
+            Configuration::CAPABILITY_INSTANT,
+            (string) json_encode([
+                'openai' => ['apiKey' => 'secret-openai-key', 'endpointUrl' => ''],
+            ])
+        );
+
+        // After the saved default provider becomes restricted, resolution must
+        // not pick it (or any other restricted provider) as the default.
+        $this->restrictSelectableProvidersTo('claude');
+
+        $settings = $this->api->getSettings();
+
+        $this->assertSame('', $settings['defaultProviderId']);
+    }
+
+    public function testDuplicateProviderRegistrationKeepsFirstSelectableFlag(): void
+    {
+        $providers = new AIProvidersList();
+        $providers->addProvider(new OpenAI(), false);
+        $providers->addProvider(new OpenAI());
+
+        $this->assertCount(1, $providers->getProviders());
+        $this->assertFalse($providers->isSelectable('openai'));
+        $this->assertSame([], $providers->getSelectableProviders());
     }
 
     public function testForcedDefaultProviderFromConfigLocksConfiguration(): void
@@ -489,6 +794,76 @@ class ConfigurationTest extends IntegrationTestCase
     {
         FakeAccess::clearAccess();
         FakeAccess::$identity = 'anonymous';
+    }
+
+    /**
+     * Stores credentials for OpenAI and Claude while the instance is still
+     * unmanaged, so managed-mode tests can then force a provider via config.
+     */
+    private function saveOpenAiAndClaudeKeys(): void
+    {
+        $this->api->saveSettings(
+            'openai',
+            Configuration::CAPABILITY_INSTANT,
+            (string) json_encode([
+                'openai' => ['apiKey' => 'secret-openai-key', 'endpointUrl' => ''],
+                'claude' => ['apiKey' => 'secret-claude-key', 'endpointUrl' => ''],
+            ])
+        );
+    }
+
+    /**
+     * Demotes every provider except the given one to non-selectable, the same
+     * way a managed environment restricts providers.
+     */
+    private function restrictSelectableProvidersTo(string $selectableProviderId): void
+    {
+        Piwik::addAction(
+            'AIProviders.filterAIProviders',
+            function (AIProvidersList $providers) use ($selectableProviderId): void {
+                foreach ($providers->getProviders() as $provider) {
+                    if ($provider->getId() !== $selectableProviderId) {
+                        $providers->setSelectable($provider->getId(), false);
+                    }
+                }
+            }
+        );
+    }
+
+    /**
+     * @param string|null $capturedUrl Set to the requested URL.
+     * @param array<string, mixed>|null $capturedBody Set to the decoded request body.
+     * @param array<int, string>|null $capturedHeaders Set to the sent request headers.
+     */
+    private function mockClaudeResponse(
+        string $text,
+        ?string &$capturedUrl,
+        ?array &$capturedBody,
+        ?array &$capturedHeaders = null
+    ): void {
+        Piwik::addAction('Http.sendHttpRequest', function (
+            string $url,
+            array $httpEventParams,
+            ?string &$response,
+            ?int &$status,
+            array &$headers
+        ) use (
+            $text,
+            &$capturedUrl,
+            &$capturedBody,
+            &$capturedHeaders
+): void {
+            $capturedUrl = $url;
+            $capturedBody = json_decode((string) $httpEventParams['body'], true);
+            $capturedHeaders = $httpEventParams['headers'];
+
+            $response = (string) json_encode([
+                'content' => [['text' => $text]],
+                'usage' => ['input_tokens' => 15, 'output_tokens' => 9],
+            ]);
+            $status = 200;
+            $headers = ['Content-Type' => 'application/json'];
+        });
     }
 
     private function mockAIProviderResponse(string $text): void

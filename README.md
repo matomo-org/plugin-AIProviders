@@ -10,7 +10,33 @@ Settings are managed from **Administration > System > AI Providers**.
 
 The plugin stores the default provider, default capability level, and provider connection settings as Matomo system settings (not shown on the generic plugin settings page). API keys are only returned to the administration UI as masked state, not as secret values.
 
-On a managed environment (for example Matomo Cloud), the default provider is forced and locked via the `[AIProviders] defaultProvider` config setting. There is nothing left to configure, so the AI Providers settings page and its admin menu entry are hidden entirely.
+On a managed environment, the default provider is forced and locked via the `[AIProviders] defaultProvider` config setting. There is nothing left to configure, so the AI Providers settings page and its admin menu entry are hidden entirely.
+
+### Config-file credentials
+
+Provider connection settings can also be supplied from the `[AIProviders]` config section or environment variables instead of the administration UI. Per field, a config-file/environment value wins over the database value:
+
+```ini
+[AIProviders]
+openaiApiKey = "..."       ; or env MATOMO_AIPROVIDERS_OPENAI_API_KEY
+openaiEndpointUrl = "..."  ; or env MATOMO_AIPROVIDERS_OPENAI_ENDPOINT_URL
+```
+
+The config key is the provider ID verbatim plus the field suffix; the environment variable upper-cases the ID and replaces `-` with `_`. Credentials supplied this way never appear in the UI as secret values and cannot be edited or removed there.
+
+### Restricted providers and the provider selection allowlist
+
+A managed environment can demote providers to *restricted* (non-selectable) in the `AIProviders.filterAIProviders` event via `AIProvidersList::setSelectable()`. Restricted providers are hidden from every admin surface and can never become the default, but stay registered for completions.
+
+Plugins listed on the centrally managed allowlist may target a specific provider and model per request even though the default provider is forced — needed by features whose purpose is to query specific AI engines:
+
+```ini
+[AIProviders]
+defaultProvider = "openai"
+providerSelectionAllowlist[] = "ExamplePlugin"
+```
+
+In a managed environment this config is locked and centrally managed, so neither the allowlist nor the providers it unlocks can be influenced by users. Allowlisted callers get no silent fallback: requesting an unknown or unconfigured provider fails with a clear error rather than answering from the wrong engine.
 
 ## Usage from other plugins
 
@@ -30,7 +56,11 @@ $text = $response->getText();
 
 Build the request with `AIRequest`: the first argument is the user prompt, the second is your plugin name (used for accountability). Optional settings such as a system prompt, model, max tokens, or temperature are set with the immutable `with*()` methods. The service resolves the provider (honouring a provider forced by a managed environment), calls it, and returns an `AIProviderResponse` with the completion text and, when the provider reports it, token usage.
 
-Credentials are resolved and used server-side by the service and are never returned to callers. Built-in providers default to low-latency models, which can be overridden per request with `AIRequest::withModel()`.
+Credentials are resolved and used server-side by the service and are never returned to callers. Built-in providers default to low-latency models, which can be overridden per request with `AIRequest::withModel()` on self-managed instances. When a managed environment forces a provider from configuration, the service also ignores caller-provided provider and model overrides — unless the calling plugin is on the `providerSelectionAllowlist` (see above), in which case its requested provider and model are honoured.
+
+**Hard rule:** the values passed to `withProviderId()` and `withModel()` must come from plugin code constants or server-side configuration, never from request input. Forwarding request parameters would let any HTTP client pick the provider and model the server calls — on managed hosting that circumvents the centrally managed provider and its cost controls. If users may choose between engines in a UI, the request parameter must be a key into a server-side map defined by your plugin, never the provider/model string itself.
+
+`AIProviderResponse` exposes the provider, model, completion text, token usage, raw decoded provider response, reasoning level used, web-search usage, and execution time. Reasoning controls, web search, and thinking budgets are currently contract stubs only: callers may set them on `AIRequest`, but the built-in providers do not send provider-specific reasoning or web-search options yet and report `none` / `false` in the response.
 
 ### JSON mode
 
@@ -43,4 +73,4 @@ $response = $service->complete(
 $data = $response->getJsonData(); // array, or null if the model did not return valid JSON
 ```
 
-Each provider asks for JSON the best way it can — `response_format` (OpenAI-compatible), `responseMimeType` (Gemini) — and AIProviders always adds a system instruction to return a single JSON object, so it works for providers without a native option (Claude, Bedrock) too. The model can still occasionally return invalid JSON, so always handle a `null` from `getJsonData()`.
+Each provider asks for JSON the best way it can — `response_format` (OpenAI-compatible), `responseMimeType` (Gemini) — and AIProviders always adds a system instruction to return a single JSON object, so it works for providers without a native option (for example Claude) too. The model can still occasionally return invalid JSON, so always handle a `null` from `getJsonData()`.

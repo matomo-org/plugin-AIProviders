@@ -13,16 +13,50 @@ namespace Piwik\Plugins\AIProviders\Model;
 
 use InvalidArgumentException;
 use Piwik\Common;
+use Piwik\Config;
 use Piwik\Settings\FieldConfig;
 use Piwik\Settings\Plugin\SystemSetting;
 use Piwik\Plugins\AIProviders\AIProvidersList;
 use Piwik\Plugins\AIProviders\Provider\AIProvider;
 
+/**
+ * Stores and resolves the AI provider configuration.
+ *
+ * Provider connection settings come from two sources, merged per field with
+ * the config file winning:
+ *
+ * 1. The database, written from the administration UI ("provider credentials"
+ *    system setting).
+ * 2. The `[AIProviders]` section of `config.ini.php`, or environment
+ *    variables, keyed per provider:
+ *
+ *        [AIProviders]
+ *        openaiApiKey = "..."       ; or env MATOMO_AIPROVIDERS_OPENAI_API_KEY
+ *        openaiEndpointUrl = "..."  ; or env MATOMO_AIPROVIDERS_OPENAI_ENDPOINT_URL
+ *
+ *    The config key is `<providerId>` verbatim plus the field suffix; the
+ *    environment variable upper-cases the ID and replaces `-` with `_`
+ *    (for example `MATOMO_AIPROVIDERS_CUSTOM_PROVIDER_API_KEY`).
+ *
+ * The config-file source is how a managed environment supplies
+ * credentials for providers its own plugins are allowed to target (see
+ * `providerSelectionAllowlist` below) without the credentials ever being
+ * stored in the database or shown in the UI. On a self-hosted instance both
+ * sources belong to the instance owner; config-file credentials simply cannot
+ * be edited or removed from the UI.
+ */
 class Configuration
 {
     public const SETTING_DEFAULT_PROVIDER = 'defaultProvider';
     public const SETTING_DEFAULT_CAPABILITY_LEVEL = 'defaultCapabilityLevel';
     public const SETTING_PROVIDER_CREDENTIALS = 'providerCredentials';
+
+    /**
+     * Key in the `[AIProviders]` config section listing the plugins that may
+     * target a specific provider per request even when a managed environment
+     * forces the default provider. See {@link isPluginAllowedToSelectProvider()}.
+     */
+    public const CONFIG_PROVIDER_SELECTION_ALLOWLIST = 'providerSelectionAllowlist';
 
     public const CAPABILITY_INSTANT = 'instant';
     public const CAPABILITY_THINKING = 'thinking';
@@ -34,11 +68,11 @@ class Configuration
      * Stored default provider ID. Persisted in the plugin settings storage, but
      * not shown on the generic plugin settings page (the settings are not
      * registered in a settings container). The value can be overridden and
-     * locked from `config.ini.php`, which is how managed environments such as
-     * Matomo Cloud force a provider:
+     * locked from `config.ini.php`, which is how managed environments force
+     * a provider:
      *
      *     [AIProviders]
-     *     defaultProvider = "bedrock"
+     *     defaultProvider = "openai"
      *
      * @var SystemSetting
      */
@@ -82,6 +116,10 @@ class Configuration
     /**
      * Returns masked AI provider settings for the administration UI.
      *
+     * Only selectable providers are included, so providers a managed
+     * environment registered as restricted (usable by allowlisted plugins
+     * only) are never revealed to admin surfaces.
+     *
      * @return array{
      *     defaultProviderId: string,
      *     defaultCapabilityLevel: string,
@@ -93,33 +131,31 @@ class Configuration
      */
     public function getSettings(AIProvidersList $providers): array
     {
-        $providerConfigurations = $this->getProviderConfigurations();
-
         return [
             'defaultProviderId' => $this->getDefaultProviderId($providers),
             'defaultCapabilityLevel' => $this->getDefaultCapabilityLevel(),
             'canEditProviderConfiguration' => $this->canEditProviderConfiguration(),
             'canEditCapabilityLevel' => $this->canEditCapabilityLevel(),
             'capabilityLevels' => $this->getCapabilityLevels(),
-            'providers' => array_map(function (AIProvider $provider) use ($providerConfigurations): array {
-                $providerConfiguration = $providerConfigurations[$provider->getId()] ?? [];
+            'providers' => array_map(function (AIProvider $provider): array {
+                $providerConfiguration = $this->getProviderConfiguration($provider->getId());
 
                 return array_merge($provider->toArray(), [
                     'configuration' => [
                         'hasApiKey' => !empty($providerConfiguration['apiKey']),
-                        'endpointUrl' => $providerConfiguration['endpointUrl'] ?? '',
-                        'isUsable' => $this->isProviderConfiguredForUse($provider, $providerConfiguration),
+                        'endpointUrl' => $providerConfiguration['endpointUrl'],
+                        'isUsable' => $provider->isConfigured($providerConfiguration),
                     ],
                 ]);
-            }, $providers->getProviders()),
+            }, $providers->getSelectableProviders()),
         ];
     }
 
     /**
      * Saves the default provider, capability level, and provider connection settings.
      *
-     * In a managed environment (for example Matomo Cloud) the provider and its
-     * credentials are forced from configuration, so nothing is persisted here.
+     * In a managed environment the provider and its credentials
+     * are forced from configuration, so nothing is persisted here.
      */
     public function saveSettings(
         AIProvidersList $providers,
@@ -130,8 +166,8 @@ class Configuration
     ): void {
         if ($this->canEditProviderConfiguration()) {
             $submittedProviderConfigurations = $this->decodeProviderConfigurations($providerConfigurationsJson);
-            $providerConfigurations = $this->saveProviderConfigurations($providers, $submittedProviderConfigurations);
-            $this->saveDefaultProviderId($providers, $defaultProviderId, $providerConfigurations);
+            $this->saveProviderConfigurations($providers, $submittedProviderConfigurations);
+            $this->saveDefaultProviderId($providers, $defaultProviderId);
         }
 
         if ($this->canEditCapabilityLevel()) {
@@ -140,20 +176,39 @@ class Configuration
     }
 
     /**
-     * Returns a server-side provider configuration including the API key.
+     * Returns the effective server-side provider configuration including the
+     * API key: per field, a value from the config file or environment wins
+     * over the database value (see the class docblock for the sources).
      *
-     * This method is intended for PHP services in trusted plugins, not for API
-     * responses or browser output.
+     * The config file always winning keeps the rule identical on managed and
+     * self-hosted instances. It is still safe in a managed environment because
+     * the UI that writes database credentials is locked there from the start,
+     * so no database value can exist to begin with.
      *
-     * @return array<string, string>
+     * The returned array contains secrets. It is internal to the AIProviders
+     * plugin and its providers and must never be returned from API methods,
+     * logged, or exposed to other plugins; other plugins run completions via
+     * {@link \Piwik\Plugins\AIProviders\AIProviderService::complete()} and
+     * never see credentials.
+     *
+     * @internal
+     * @return array{apiKey: string, endpointUrl: string}
      */
     public function getProviderConfiguration(string $providerId): array
     {
-        $providerConfigurations = $this->getProviderConfigurations();
-
-        return $providerConfigurations[$providerId] ?? [
+        $storedConfiguration = $this->getProviderConfigurations()[$providerId] ?? [
             'apiKey' => '',
             'endpointUrl' => '',
+        ];
+        $configFileConfiguration = $this->getConfigFileProviderConfiguration($providerId);
+
+        return [
+            'apiKey' => $configFileConfiguration['apiKey'] !== ''
+                ? $configFileConfiguration['apiKey']
+                : $storedConfiguration['apiKey'],
+            'endpointUrl' => $configFileConfiguration['endpointUrl'] !== ''
+                ? $configFileConfiguration['endpointUrl']
+                : $storedConfiguration['endpointUrl'],
         ];
     }
 
@@ -169,23 +224,33 @@ class Configuration
         #[\SensitiveParameter]
         array $submittedProviderConfiguration = []
     ): array {
-        $existingProviderConfigurations = $this->getProviderConfigurations();
         $providerId = $provider->getId();
+        // Base the merge on the effective configuration so a connection test
+        // exercises what complete() would actually use, including config-file
+        // credentials.
+        $existingConfiguration = $this->getProviderConfiguration($providerId);
         $submittedProviderConfiguration = array_merge(
-            $existingProviderConfigurations[$providerId] ?? [],
+            $existingConfiguration,
             $submittedProviderConfiguration
         );
 
         return [
             'apiKey' => $this->getSubmittedApiKey(
                 $submittedProviderConfiguration,
-                $existingProviderConfigurations,
+                [$providerId => $existingConfiguration],
                 $providerId
             ),
             'endpointUrl' => $this->getSubmittedEndpointUrl($submittedProviderConfiguration, $provider),
         ];
     }
 
+    /**
+     * Removes the database-stored connection settings for a provider.
+     *
+     * Credentials supplied via the config file or environment (see the class
+     * docblock) are not touched: they are not stored in the database and can
+     * only be removed where they were defined.
+     */
     public function removeProviderConfiguration(string $providerId): void
     {
         $providerConfigurations = $this->getProviderConfigurations();
@@ -216,7 +281,7 @@ class Configuration
      * Returns whether provider connections can be edited in the UI.
      *
      * Provider configuration is locked whenever the default provider is forced
-     * from configuration (a managed environment such as Matomo Cloud).
+     * from configuration (a managed environment).
      */
     public function canEditProviderConfiguration(): bool
     {
@@ -247,15 +312,16 @@ class Configuration
     }
 
     /**
-     * Returns the configured default provider ID, falling back to the first configured provider.
+     * Returns the configured default provider ID, falling back to the first
+     * configured provider. Only selectable providers are considered, so a
+     * restricted provider can never become the default.
      */
     public function getDefaultProviderId(AIProvidersList $providers): string
     {
-        $providerConfigurations = $this->getProviderConfigurations();
         $providerId = $this->defaultProvider->getValue();
 
         /**
-         * When forced from configuration (for example Matomo Cloud), use the
+         * When forced from configuration, use the
          * configured provider as-is so misconfiguration surfaces a clear error
          * from the provider rather than silently falling back.
          */
@@ -265,40 +331,28 @@ class Configuration
 
         if (
             is_string($providerId)
-            && $providers->hasProvider($providerId)
-            && $this->isProviderConfiguredForUse(
-                $providers->getProvider($providerId),
-                $providerConfigurations[$providerId] ?? []
-            )
+            && $providers->isSelectable($providerId)
+            && $this->isProviderUsable($providers->getProvider($providerId))
         ) {
             return $providerId;
         }
 
         if (
-            $providers->hasProvider(self::DEFAULT_PROVIDER_ID)
-            && $this->isProviderConfiguredForUse(
-                $providers->getProvider(self::DEFAULT_PROVIDER_ID),
-                $providerConfigurations[self::DEFAULT_PROVIDER_ID] ?? []
-            )
+            $providers->isSelectable(self::DEFAULT_PROVIDER_ID)
+            && $this->isProviderUsable($providers->getProvider(self::DEFAULT_PROVIDER_ID))
         ) {
             return self::DEFAULT_PROVIDER_ID;
         }
 
-        return $this->getFirstConfiguredProviderId($providers, $providerConfigurations);
+        return $this->getFirstConfiguredProviderId($providers);
     }
 
-    /**
-     * @param array<string, array<string, string>> $providerConfigurations
-     */
-    private function saveDefaultProviderId(
-        AIProvidersList $providers,
-        string $providerId,
-        array $providerConfigurations
-    ): void {
+    private function saveDefaultProviderId(AIProvidersList $providers, string $providerId): void
+    {
         $providerId = trim($providerId);
 
         if ($providerId === '') {
-            $providerId = $this->getFirstConfiguredProviderId($providers, $providerConfigurations);
+            $providerId = $this->getFirstConfiguredProviderId($providers);
 
             if ($providerId === '') {
                 $this->defaultProvider->setValue('');
@@ -307,16 +361,13 @@ class Configuration
             }
         }
 
-        if (!$providers->hasProvider($providerId)) {
+        // Restricted providers are reported as unknown on purpose: admin
+        // surfaces must not reveal that they exist.
+        if (!$providers->hasProvider($providerId) || !$providers->isSelectable($providerId)) {
             throw new InvalidArgumentException(sprintf('Unknown AI provider "%s".', $providerId));
         }
 
-        if (
-            !$this->isProviderConfiguredForUse(
-                $providers->getProvider($providerId),
-                $providerConfigurations[$providerId] ?? []
-            )
-        ) {
+        if (!$this->isProviderUsable($providers->getProvider($providerId))) {
             throw new InvalidArgumentException(sprintf('AI provider "%s" is not configured.', $providerId));
         }
 
@@ -406,18 +457,24 @@ class Configuration
     }
 
     /**
+     * Persists the submitted provider connection settings to the database.
+     *
+     * Only selectable providers are accepted, so restricted providers cannot
+     * be configured through the administration flow. The API key fallback
+     * reads the stored (database) value on purpose: config-file credentials
+     * must never be copied into the database.
+     *
      * @param array<string, mixed> $submittedProviderConfigurations
-     * @return array<string, array<string, string>>
      */
     private function saveProviderConfigurations(
         AIProvidersList $providers,
         #[\SensitiveParameter]
         array $submittedProviderConfigurations
-    ): array {
+    ): void {
         $existingProviderConfigurations = $this->getProviderConfigurations();
         $providerConfigurations = [];
 
-        foreach ($providers->getProviders() as $provider) {
+        foreach ($providers->getSelectableProviders() as $provider) {
             $providerId = $provider->getId();
             $submittedProviderConfiguration = $submittedProviderConfigurations[$providerId] ?? [];
 
@@ -440,8 +497,6 @@ class Configuration
 
         $this->providerCredentials->setValue($providerConfigurations);
         $this->providerCredentials->save();
-
-        return $providerConfigurations;
     }
 
     /**
@@ -500,16 +555,11 @@ class Configuration
         return $endpointUrl;
     }
 
-    /**
-     * @param array<string, array<string, string>> $providerConfigurations
-     */
-    private function getFirstConfiguredProviderId(AIProvidersList $providers, array $providerConfigurations): string
+    private function getFirstConfiguredProviderId(AIProvidersList $providers): string
     {
-        foreach ($providers->getProviders() as $provider) {
-            $providerId = $provider->getId();
-
-            if ($this->isProviderConfiguredForUse($provider, $providerConfigurations[$providerId] ?? [])) {
-                return $providerId;
+        foreach ($providers->getSelectableProviders() as $provider) {
+            if ($this->isProviderUsable($provider)) {
+                return $provider->getId();
             }
         }
 
@@ -517,14 +567,98 @@ class Configuration
     }
 
     /**
-     * @param array<string, string> $providerConfiguration
+     * Returns whether the provider can run completions with its effective
+     * configuration (database merged with config file/environment).
      */
-    private function isProviderConfiguredForUse(?AIProvider $provider, array $providerConfiguration): bool
+    private function isProviderUsable(?AIProvider $provider): bool
     {
         if ($provider === null) {
             return false;
         }
 
-        return $provider->isConfigured($providerConfiguration);
+        return $provider->isConfigured($this->getProviderConfiguration($provider->getId()));
+    }
+
+    /**
+     * Returns whether the given plugin may target a specific provider (and
+     * model) per request even though a managed environment forces the default
+     * provider. Controlled by the `[AIProviders] providerSelectionAllowlist[]`
+     * config entries, which a managed environment keeps in its locked,
+     * centrally managed config.
+     *
+     * This is a policy gate for centrally deployed plugins, not a sandbox:
+     * the caller plugin name on an {@link \Piwik\Plugins\AIProviders\AIRequest}
+     * is self-declared, and PHP code on the same instance can ultimately not
+     * be restrained from anything. The guarantee that matters is that on a
+     * managed instance neither this allowlist nor the values an allowlisted
+     * plugin passes can be influenced by users (see the hard rule on
+     * {@link \Piwik\Plugins\AIProviders\AIRequest::withProviderId()}).
+     */
+    public function isPluginAllowedToSelectProvider(string $pluginName): bool
+    {
+        if ($pluginName === '') {
+            return false;
+        }
+
+        return in_array($pluginName, $this->getProviderSelectionAllowlist(), true);
+    }
+
+    /**
+     * @return string[]
+     */
+    private function getProviderSelectionAllowlist(): array
+    {
+        $config = Config::getInstance()->AIProviders;
+        $allowlist = is_array($config) ? ($config[self::CONFIG_PROVIDER_SELECTION_ALLOWLIST] ?? []) : [];
+
+        // A single `providerSelectionAllowlist = "X"` entry (without `[]`)
+        // parses as a string; accept it as a one-element list.
+        if (is_string($allowlist)) {
+            $allowlist = [$allowlist];
+        }
+
+        if (!is_array($allowlist)) {
+            return [];
+        }
+
+        return array_values(array_filter($allowlist, 'is_string'));
+    }
+
+    /**
+     * Returns the provider connection settings supplied via the config file or
+     * environment variables (see the class docblock for the exact keys).
+     *
+     * @return array{apiKey: string, endpointUrl: string}
+     */
+    private function getConfigFileProviderConfiguration(string $providerId): array
+    {
+        return [
+            'apiKey' => $this->getConfigFileValue($providerId, 'ApiKey', 'API_KEY'),
+            'endpointUrl' => $this->getConfigFileValue($providerId, 'EndpointUrl', 'ENDPOINT_URL'),
+        ];
+    }
+
+    /**
+     * Reads one provider connection field from the `[AIProviders]` config
+     * section (key `<providerId><configSuffix>`), falling back to the
+     * environment variable `MATOMO_AIPROVIDERS_<PROVIDER_ID>_<ENV_SUFFIX>`.
+     */
+    private function getConfigFileValue(string $providerId, string $configSuffix, string $envSuffix): string
+    {
+        $config = Config::getInstance()->AIProviders;
+        $configKey = $providerId . $configSuffix;
+
+        if (is_array($config) && isset($config[$configKey]) && is_string($config[$configKey]) && trim($config[$configKey]) !== '') {
+            return trim($config[$configKey]);
+        }
+
+        $envKey = 'MATOMO_AIPROVIDERS_' . strtoupper(str_replace('-', '_', $providerId)) . '_' . $envSuffix;
+        $envValue = getenv($envKey);
+
+        if (is_string($envValue) && trim($envValue) !== '') {
+            return trim($envValue);
+        }
+
+        return '';
     }
 }
