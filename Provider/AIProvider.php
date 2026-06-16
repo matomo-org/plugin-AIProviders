@@ -222,7 +222,7 @@ abstract class AIProvider
         $payload = [
             'model' => $model,
             'messages' => $messages,
-            'max_tokens' => $request->getMaxTokens(),
+            'max_completion_tokens' => $request->getMaxTokens(),
             'temperature' => $request->getTemperature(),
         ];
 
