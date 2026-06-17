@@ -8,6 +8,7 @@
 export interface ProviderConfiguration {
   apiKey: string;
   endpointUrl: string;
+  model: string;
 }
 
 export interface Provider {
@@ -19,6 +20,7 @@ export interface Provider {
   configuration: {
     hasApiKey: boolean;
     endpointUrl: string;
+    model: string;
     isUsable: boolean;
   };
 }
@@ -43,9 +45,8 @@ export interface CapabilityLevelOption {
   description: string;
 }
 
-export interface AIProviderResponse {
+export interface TestConnectionResponse {
   providerId: string;
   providerName: string;
-  model: string;
-  text: string;
+  models: string[];
 }

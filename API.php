@@ -16,7 +16,6 @@ use Piwik\Container\StaticContainer;
 use Piwik\Common;
 use Piwik\Piwik;
 use Piwik\Plugin\API as PluginAPI;
-use Piwik\Plugins\AIProviders\AIRequest;
 use Piwik\Plugins\AIProviders\Model\Configuration;
 use Piwik\Plugins\AIProviders\Provider\AIProvider;
 
@@ -83,8 +82,10 @@ class API extends PluginAPI
      * @param string $providerId Provider ID to test.
      * @param string $providerConfiguration JSON object with unsaved apiKey
      *                                      and endpointUrl values.
-     * @return array<string, string> Provider response metadata and completion text.
-     * @throws Exception
+     * @return array{providerId: string, providerName: string, models: list<string>}
+     *         Tested provider's metadata and the models it can serve (empty for
+     *         providers that do not expose a model listing).
+     * @throws Exception when the connection cannot be established.
      */
     public function testConnection(
         string $providerId,
@@ -100,13 +101,13 @@ class API extends PluginAPI
             $this->decodeProviderConfiguration($providerConfiguration)
         );
 
-        $request = (new AIRequest('why is the sky blue, answer in 7 words', 'AIProviders'))
-            ->withFeatureKey('test-connection')
-            ->withMaxTokens(32);
+        $this->getAIProviderService()->testProviderConnection($provider, $configuration);
 
-        return $this->getAIProviderService()
-            ->testProviderConnection($provider, $configuration, $request)
-            ->toArray();
+        return [
+            'providerId' => $provider->getId(),
+            'providerName' => $provider->getName(),
+            'models' => $provider->listModels($configuration),
+        ];
     }
 
     /**

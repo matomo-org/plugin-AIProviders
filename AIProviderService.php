@@ -60,32 +60,13 @@ class AIProviderService
     public function complete(AIRequest $request): AIProviderResponse
     {
         $providers = AIProviders::getAvailableProviders();
+        $resolution = $this->resolveProviderId($request->getProviderId(), $request->getCallerPluginName(), $providers);
 
-        $forcedProviderId = $this->configuration->getForcedProviderId();
-        $requestedProviderId = $request->getProviderId();
-        $hasRequestedProvider = $requestedProviderId !== null && $requestedProviderId !== '';
-
-        if ($forcedProviderId !== null && $hasRequestedProvider && $this->isCallerAllowedToSelectProvider($request)) {
-            // TODO: consider validating the requested model against a
-            // per-provider `allowedModels` list from the managed config as a
-            // cost backstop, once the planned `AIProviders.usage` event (see
-            // below) shows whether actual token usage needs it.
-            $providerId = $requestedProviderId;
-        } elseif ($forcedProviderId !== null) {
-            $providerId = $forcedProviderId;
-            $request = $request->withProviderId($forcedProviderId)->withModel(null);
-        } elseif ($hasRequestedProvider) {
-            $providerId = $requestedProviderId;
-        } else {
-            $providerId = $this->configuration->getDefaultProviderId($providers);
+        if ($resolution['stripRequestedModel']) {
+            $request = $request->withProviderId($resolution['providerId'])->withModel(null);
         }
 
-        $provider = $providers->getProvider($providerId);
-
-        if ($provider === null) {
-            throw new InvalidArgumentException(sprintf('Unknown AI provider "%s".', $providerId));
-        }
-
+        $provider = $this->requireProvider($providers, $resolution['providerId']);
         $configuration = $this->configuration->getProviderConfiguration($provider->getId());
 
         $response = $this->runWithProvider($provider, $configuration, $request);
@@ -112,21 +93,69 @@ class AIProviderService
     }
 
     /**
-     * Returns whether the request's caller plugin may pick the provider even
-     * though a managed environment forces the default. The caller name on the
-     * request is self-declared; see
-     * {@link Configuration::isPluginAllowedToSelectProvider()} for why this is
-     * a policy gate, not a sandbox.
+     * Resolves which provider a request runs through: the provider forced by
+     * a managed environment, then the caller's requested provider (always on
+     * unmanaged instances; on managed instances only for callers on the
+     * `providerSelectionAllowlist` — the caller name is self-declared, see
+     * {@link Configuration::isPluginAllowedToSelectProvider()} for why this
+     * is a policy gate, not a sandbox), then the configured default.
+     *
+     * `stripRequestedModel` is true when the forced provider overrode the
+     * request, in which case the caller must also drop the requested model
+     * because the model decides cost on managed instances.
+     *
+     * @return array{providerId: string, stripRequestedModel: bool}
      */
-    private function isCallerAllowedToSelectProvider(AIRequest $request): bool
+    private function resolveProviderId(
+        ?string $requestedProviderId,
+        string $callerPluginName,
+        AIProvidersList $providers
+    ): array {
+        $forcedProviderId = $this->configuration->getForcedProviderId();
+        $hasRequestedProvider = $requestedProviderId !== null && $requestedProviderId !== '';
+
+        if (
+            $forcedProviderId !== null
+            && $hasRequestedProvider
+            && $this->configuration->isPluginAllowedToSelectProvider($callerPluginName)
+        ) {
+            // TODO: consider validating the requested model against a
+            // per-provider `allowedModels` list from the managed config as a
+            // cost backstop, once the planned `AIProviders.usage` event shows
+            // whether actual token usage needs it.
+            return ['providerId' => $requestedProviderId, 'stripRequestedModel' => false];
+        }
+
+        if ($forcedProviderId !== null) {
+            return ['providerId' => $forcedProviderId, 'stripRequestedModel' => true];
+        }
+
+        if ($hasRequestedProvider) {
+            return ['providerId' => $requestedProviderId, 'stripRequestedModel' => false];
+        }
+
+        return [
+            'providerId' => $this->configuration->getDefaultProviderId($providers),
+            'stripRequestedModel' => false,
+        ];
+    }
+
+    private function requireProvider(AIProvidersList $providers, string $providerId): AIProvider
     {
-        return $this->configuration->isPluginAllowedToSelectProvider($request->getCallerPluginName());
+        $provider = $providers->getProvider($providerId);
+
+        if ($provider === null) {
+            throw new InvalidArgumentException(sprintf('Unknown AI provider "%s".', $providerId));
+        }
+
+        return $provider;
     }
 
     /**
-     * Runs a request against a specific provider and configuration, with no
-     * provider resolution. Restricted to the admin "test connection" flow, which
-     * needs to test an unsaved provider/configuration before it is stored.
+     * Validates a specific provider and configuration, with no provider
+     * resolution. Restricted to the admin "test connection" flow, which needs
+     * to test an unsaved provider/configuration before it is stored. Delegates
+     * to the provider's lightweight connection probe and throws on failure.
      *
      * Callers must enforce their own access control (the admin API gates this
      * behind super-user access). Because it bypasses resolution — including the
@@ -135,14 +164,14 @@ class AIProviderService
      *
      * @param array<string, string> $configuration
      */
-    public function testProviderConnection(AIProvider $provider, array $configuration, AIRequest $request): AIProviderResponse
+    public function testProviderConnection(AIProvider $provider, array $configuration): void
     {
-        return $this->runWithProvider($provider, $configuration, $request);
+        $provider->verifyConnection($configuration);
     }
 
     /**
      * Executes the request against the given provider and guards against an empty
-     * completion. Shared by {@link complete()} and {@link testProviderConnection()}.
+     * completion. Used by {@link complete()}.
      *
      * @param array<string, string> $configuration
      */
@@ -166,13 +195,8 @@ class AIProviderService
         $providers = AIProviders::getAvailableProviders();
         $forcedProviderId = $this->configuration->getForcedProviderId();
         $providerId = $forcedProviderId ?? $this->configuration->getDefaultProviderId($providers);
-        $provider = $providers->getProvider($providerId);
 
-        if ($provider === null) {
-            throw new InvalidArgumentException(sprintf('Unknown AI provider "%s".', $providerId));
-        }
-
-        return $provider;
+        return $this->requireProvider($providers, $providerId);
     }
 
     /**

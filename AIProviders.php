@@ -91,6 +91,7 @@ class AIProviders extends Plugin
         $translations[] = 'AIProviders_ApiKeyAlreadyConfiguredPlaceholder';
         $translations[] = 'AIProviders_ApiKeyPlaceholder';
         $translations[] = 'AIProviders_ClaudeDescription';
+        $translations[] = 'AIProviders_ClickTestConnectionToShowAvailableModels';
         $translations[] = 'AIProviders_CloudConfigurationHelp';
         $translations[] = 'AIProviders_ConfigurationIntro';
         $translations[] = 'AIProviders_CustomProviderDescription';
@@ -109,10 +110,12 @@ class AIProviders extends Plugin
         $translations[] = 'AIProviders_InstantCapability';
         $translations[] = 'AIProviders_InstantCapabilityDescription';
         $translations[] = 'AIProviders_MenuTitle';
+        $translations[] = 'AIProviders_Model';
+        $translations[] = 'AIProviders_ModelPlaceholder';
         $translations[] = 'AIProviders_NoDefaultProviderWarning';
         $translations[] = 'AIProviders_OpenAIDescription';
+        $translations[] = 'AIProviders_RefreshModels';
         $translations[] = 'AIProviders_RequestFailed';
-        $translations[] = 'AIProviders_SelectedConfiguration';
         $translations[] = 'AIProviders_SettingsSaveSuccess';
         $translations[] = 'AIProviders_StatusConnected';
         $translations[] = 'AIProviders_StatusNotConnected';
@@ -122,6 +125,7 @@ class AIProviders extends Plugin
         $translations[] = 'AIProviders_ThinkingCapability';
         $translations[] = 'AIProviders_ThinkingCapabilityDescription';
         $translations[] = 'AIProviders_UnexpectedError';
+        $translations[] = 'AIProviders_UnsavedChanges';
         $translations[] = 'General_Cancel';
         $translations[] = 'General_LoadingData';
     }

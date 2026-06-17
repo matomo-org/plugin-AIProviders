@@ -103,17 +103,32 @@ module.exports = __WEBPACK_EXTERNAL_MODULE__19dc__;
 
 /***/ }),
 
+/***/ "2bcb":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var _node_modules_vue_cli_service_node_modules_mini_css_extract_plugin_dist_loader_js_ref_11_oneOf_1_0_node_modules_vue_cli_service_node_modules_css_loader_dist_cjs_js_ref_11_oneOf_1_1_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_stylePostLoader_js_node_modules_postcss_loader_src_index_js_ref_11_oneOf_1_2_node_modules_less_loader_dist_cjs_js_ref_11_oneOf_1_3_node_modules_vue_cli_service_node_modules_cache_loader_dist_cjs_js_ref_1_0_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_index_js_ref_1_1_ProviderCard_vue_vue_type_style_index_0_id_460335a0_lang_less__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("f3df");
+/* harmony import */ var _node_modules_vue_cli_service_node_modules_mini_css_extract_plugin_dist_loader_js_ref_11_oneOf_1_0_node_modules_vue_cli_service_node_modules_css_loader_dist_cjs_js_ref_11_oneOf_1_1_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_stylePostLoader_js_node_modules_postcss_loader_src_index_js_ref_11_oneOf_1_2_node_modules_less_loader_dist_cjs_js_ref_11_oneOf_1_3_node_modules_vue_cli_service_node_modules_cache_loader_dist_cjs_js_ref_1_0_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_index_js_ref_1_1_ProviderCard_vue_vue_type_style_index_0_id_460335a0_lang_less__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_vue_cli_service_node_modules_mini_css_extract_plugin_dist_loader_js_ref_11_oneOf_1_0_node_modules_vue_cli_service_node_modules_css_loader_dist_cjs_js_ref_11_oneOf_1_1_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_stylePostLoader_js_node_modules_postcss_loader_src_index_js_ref_11_oneOf_1_2_node_modules_less_loader_dist_cjs_js_ref_11_oneOf_1_3_node_modules_vue_cli_service_node_modules_cache_loader_dist_cjs_js_ref_1_0_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_index_js_ref_1_1_ProviderCard_vue_vue_type_style_index_0_id_460335a0_lang_less__WEBPACK_IMPORTED_MODULE_0__);
+/* unused harmony reexport * */
+
+
+/***/ }),
+
+/***/ "8aee":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var _node_modules_vue_cli_service_node_modules_mini_css_extract_plugin_dist_loader_js_ref_11_oneOf_1_0_node_modules_vue_cli_service_node_modules_css_loader_dist_cjs_js_ref_11_oneOf_1_1_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_stylePostLoader_js_node_modules_postcss_loader_src_index_js_ref_11_oneOf_1_2_node_modules_less_loader_dist_cjs_js_ref_11_oneOf_1_3_node_modules_vue_cli_service_node_modules_cache_loader_dist_cjs_js_ref_1_0_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_index_js_ref_1_1_ManageAIProviders_vue_vue_type_style_index_0_id_fe726658_lang_less__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("b47f");
+/* harmony import */ var _node_modules_vue_cli_service_node_modules_mini_css_extract_plugin_dist_loader_js_ref_11_oneOf_1_0_node_modules_vue_cli_service_node_modules_css_loader_dist_cjs_js_ref_11_oneOf_1_1_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_stylePostLoader_js_node_modules_postcss_loader_src_index_js_ref_11_oneOf_1_2_node_modules_less_loader_dist_cjs_js_ref_11_oneOf_1_3_node_modules_vue_cli_service_node_modules_cache_loader_dist_cjs_js_ref_1_0_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_index_js_ref_1_1_ManageAIProviders_vue_vue_type_style_index_0_id_fe726658_lang_less__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_vue_cli_service_node_modules_mini_css_extract_plugin_dist_loader_js_ref_11_oneOf_1_0_node_modules_vue_cli_service_node_modules_css_loader_dist_cjs_js_ref_11_oneOf_1_1_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_stylePostLoader_js_node_modules_postcss_loader_src_index_js_ref_11_oneOf_1_2_node_modules_less_loader_dist_cjs_js_ref_11_oneOf_1_3_node_modules_vue_cli_service_node_modules_cache_loader_dist_cjs_js_ref_1_0_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_index_js_ref_1_1_ManageAIProviders_vue_vue_type_style_index_0_id_fe726658_lang_less__WEBPACK_IMPORTED_MODULE_0__);
+/* unused harmony reexport * */
+
+
+/***/ }),
+
 /***/ "8bbf":
 /***/ (function(module, exports) {
 
 module.exports = __WEBPACK_EXTERNAL_MODULE__8bbf__;
-
-/***/ }),
-
-/***/ "8dd7":
-/***/ (function(module, exports, __webpack_require__) {
-
-// extracted by mini-css-extract-plugin
 
 /***/ }),
 
@@ -124,32 +139,17 @@ module.exports = __WEBPACK_EXTERNAL_MODULE_a5a2__;
 
 /***/ }),
 
-/***/ "cd4b":
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var _node_modules_vue_cli_service_node_modules_mini_css_extract_plugin_dist_loader_js_ref_11_oneOf_1_0_node_modules_vue_cli_service_node_modules_css_loader_dist_cjs_js_ref_11_oneOf_1_1_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_stylePostLoader_js_node_modules_postcss_loader_src_index_js_ref_11_oneOf_1_2_node_modules_less_loader_dist_cjs_js_ref_11_oneOf_1_3_node_modules_vue_cli_service_node_modules_cache_loader_dist_cjs_js_ref_1_0_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_index_js_ref_1_1_ProviderCard_vue_vue_type_style_index_0_id_795d013e_lang_less__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("ee6f");
-/* harmony import */ var _node_modules_vue_cli_service_node_modules_mini_css_extract_plugin_dist_loader_js_ref_11_oneOf_1_0_node_modules_vue_cli_service_node_modules_css_loader_dist_cjs_js_ref_11_oneOf_1_1_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_stylePostLoader_js_node_modules_postcss_loader_src_index_js_ref_11_oneOf_1_2_node_modules_less_loader_dist_cjs_js_ref_11_oneOf_1_3_node_modules_vue_cli_service_node_modules_cache_loader_dist_cjs_js_ref_1_0_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_index_js_ref_1_1_ProviderCard_vue_vue_type_style_index_0_id_795d013e_lang_less__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_vue_cli_service_node_modules_mini_css_extract_plugin_dist_loader_js_ref_11_oneOf_1_0_node_modules_vue_cli_service_node_modules_css_loader_dist_cjs_js_ref_11_oneOf_1_1_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_stylePostLoader_js_node_modules_postcss_loader_src_index_js_ref_11_oneOf_1_2_node_modules_less_loader_dist_cjs_js_ref_11_oneOf_1_3_node_modules_vue_cli_service_node_modules_cache_loader_dist_cjs_js_ref_1_0_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_index_js_ref_1_1_ProviderCard_vue_vue_type_style_index_0_id_795d013e_lang_less__WEBPACK_IMPORTED_MODULE_0__);
-/* unused harmony reexport * */
-
-
-/***/ }),
-
-/***/ "ee6f":
+/***/ "b47f":
 /***/ (function(module, exports, __webpack_require__) {
 
 // extracted by mini-css-extract-plugin
 
 /***/ }),
 
-/***/ "f4a9":
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
+/***/ "f3df":
+/***/ (function(module, exports, __webpack_require__) {
 
-"use strict";
-/* harmony import */ var _node_modules_vue_cli_service_node_modules_mini_css_extract_plugin_dist_loader_js_ref_11_oneOf_1_0_node_modules_vue_cli_service_node_modules_css_loader_dist_cjs_js_ref_11_oneOf_1_1_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_stylePostLoader_js_node_modules_postcss_loader_src_index_js_ref_11_oneOf_1_2_node_modules_less_loader_dist_cjs_js_ref_11_oneOf_1_3_node_modules_vue_cli_service_node_modules_cache_loader_dist_cjs_js_ref_1_0_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_index_js_ref_1_1_ManageAIProviders_vue_vue_type_style_index_0_id_a772204a_lang_less__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("8dd7");
-/* harmony import */ var _node_modules_vue_cli_service_node_modules_mini_css_extract_plugin_dist_loader_js_ref_11_oneOf_1_0_node_modules_vue_cli_service_node_modules_css_loader_dist_cjs_js_ref_11_oneOf_1_1_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_stylePostLoader_js_node_modules_postcss_loader_src_index_js_ref_11_oneOf_1_2_node_modules_less_loader_dist_cjs_js_ref_11_oneOf_1_3_node_modules_vue_cli_service_node_modules_cache_loader_dist_cjs_js_ref_1_0_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_index_js_ref_1_1_ManageAIProviders_vue_vue_type_style_index_0_id_a772204a_lang_less__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_vue_cli_service_node_modules_mini_css_extract_plugin_dist_loader_js_ref_11_oneOf_1_0_node_modules_vue_cli_service_node_modules_css_loader_dist_cjs_js_ref_11_oneOf_1_1_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_stylePostLoader_js_node_modules_postcss_loader_src_index_js_ref_11_oneOf_1_2_node_modules_less_loader_dist_cjs_js_ref_11_oneOf_1_3_node_modules_vue_cli_service_node_modules_cache_loader_dist_cjs_js_ref_1_0_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_index_js_ref_1_1_ManageAIProviders_vue_vue_type_style_index_0_id_a772204a_lang_less__WEBPACK_IMPORTED_MODULE_0__);
-/* unused harmony reexport * */
-
+// extracted by mini-css-extract-plugin
 
 /***/ }),
 
@@ -209,10 +209,23 @@ const _hoisted_6 = {
   class: "ai-providers-card-description"
 };
 const _hoisted_7 = {
+  key: 1,
+  class: "ai-providers-card-model"
+};
+const _hoisted_8 = {
+  key: 1,
+  class: "ai-providers-card-model-help"
+};
+const _hoisted_9 = ["disabled", "title"];
+const _hoisted_10 = /*#__PURE__*/Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("span", {
+  "aria-hidden": "true",
+  class: "icon icon-reload"
+}, null, -1);
+const _hoisted_11 = {
   class: "ai-providers-card-actions"
 };
-const _hoisted_8 = ["disabled"];
-const _hoisted_9 = ["disabled"];
+const _hoisted_12 = ["disabled"];
+const _hoisted_13 = ["disabled"];
 
 
 
@@ -221,6 +234,7 @@ const _hoisted_9 = ["disabled"];
   props: {
     provider: null,
     configuration: null,
+    availableModels: null,
     selected: {
       type: Boolean
     },
@@ -237,7 +251,7 @@ const _hoisted_9 = ["disabled"];
       type: Boolean
     }
   },
-  emits: ["select", "update:apiKey", "update:endpointUrl", "test", "disconnect"],
+  emits: ["select", "update:apiKey", "update:endpointUrl", "update:model", "test", "disconnect"],
   setup(__props, {
     emit
   }) {
@@ -248,13 +262,27 @@ const _hoisted_9 = ["disabled"];
       var _props$configuration$, _props$configuration;
       return ((_props$configuration$ = (_props$configuration = props.configuration) === null || _props$configuration === void 0 ? void 0 : _props$configuration.apiKey) !== null && _props$configuration$ !== void 0 ? _props$configuration$ : '') !== '';
     });
+    const hasEndpointUrl = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["computed"])(() => {
+      var _props$configuration$2, _props$configuration2;
+      return ((_props$configuration$2 = (_props$configuration2 = props.configuration) === null || _props$configuration2 === void 0 ? void 0 : _props$configuration2.endpointUrl) !== null && _props$configuration$2 !== void 0 ? _props$configuration$2 : '') !== '';
+    });
+    // Custom endpoints may run without a key, so reaching the server only needs the
+    // URL; fixed hosted providers need a key (pending or already stored).
+    const canTest = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["computed"])(() => props.provider.supportsCustomEndpoint ? hasEndpointUrl.value : hasPendingKey.value || props.provider.configuration.hasApiKey);
+    const modelOptions = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["computed"])(() => {
+      const options = {};
+      props.availableModels.forEach(model => {
+        options[model] = model;
+      });
+      return options;
+    });
     function selectProvider() {
       if (props.usableAsDefault) {
         emit('select');
       }
     }
     return (_ctx, _cache) => {
-      var _props$configuration2, _props$configuration3;
+      var _props$configuration3, _props$configuration4, _props$configuration5;
       return Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("div", {
         "aria-checked": __props.selected,
         "aria-disabled": !__props.usableAsDefault,
@@ -264,13 +292,13 @@ const _hoisted_9 = ["disabled"];
         }, "ai-providers-card"]),
         role: "radio",
         tabindex: __props.usableAsDefault ? 0 : -1,
-        onClick: _cache[4] || (_cache[4] = $event => selectProvider()),
-        onKeydown: [_cache[5] || (_cache[5] = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withKeys"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withModifiers"])($event => selectProvider(), ["prevent"]), ["enter"])), _cache[6] || (_cache[6] = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withKeys"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withModifiers"])($event => selectProvider(), ["prevent"]), ["space"]))]
+        onClick: _cache[6] || (_cache[6] = $event => selectProvider()),
+        onKeydown: [_cache[7] || (_cache[7] = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withKeys"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withModifiers"])($event => selectProvider(), ["prevent"]), ["enter"])), _cache[8] || (_cache[8] = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withKeys"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withModifiers"])($event => selectProvider(), ["prevent"]), ["space"]))]
       }, [__props.selected ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("div", _hoisted_2, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_DefaultBadge')), 1)) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", _hoisted_3, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", _hoisted_4, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("span", _hoisted_5, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(__props.provider.name), 1)]), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("p", _hoisted_6, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])(__props.provider.description)), 1), __props.canEdit ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])(external_commonjs_vue_commonjs2_vue_root_Vue_["Fragment"], {
         key: 0
       }, [__props.provider.supportsCustomEndpoint ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createBlock"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CorePluginsAdmin_["Field"]), {
         key: 0,
-        "model-value": (_props$configuration2 = __props.configuration) === null || _props$configuration2 === void 0 ? void 0 : _props$configuration2.endpointUrl,
+        "model-value": (_props$configuration3 = __props.configuration) === null || _props$configuration3 === void 0 ? void 0 : _props$configuration3.endpointUrl,
         name: `endpointUrl-${__props.provider.id}`,
         title: Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_EndpointUrl'),
         placeholder: Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_EndpointUrlPlaceholder'),
@@ -279,7 +307,7 @@ const _hoisted_9 = ["disabled"];
         uicontrol: "text",
         "onUpdate:modelValue": _cache[0] || (_cache[0] = $event => emit('update:endpointUrl', `${$event}`))
       }, null, 8, ["model-value", "name", "title", "placeholder"])) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withDirectives"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createVNode"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CorePluginsAdmin_["Field"]), {
-        "model-value": (_props$configuration3 = __props.configuration) === null || _props$configuration3 === void 0 ? void 0 : _props$configuration3.apiKey,
+        "model-value": (_props$configuration4 = __props.configuration) === null || _props$configuration4 === void 0 ? void 0 : _props$configuration4.apiKey,
         name: `apiKey-${__props.provider.id}`,
         placeholder: __props.provider.configuration.hasApiKey ? Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_ApiKeyAlreadyConfiguredPlaceholder') : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_ApiKeyPlaceholder'),
         title: Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_ApiKey'),
@@ -287,31 +315,47 @@ const _hoisted_9 = ["disabled"];
         "full-width": "",
         uicontrol: "password",
         "onUpdate:modelValue": _cache[1] || (_cache[1] = $event => emit('update:apiKey', `${$event}`))
-      }, null, 8, ["model-value", "name", "placeholder", "title"]), [[Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["AutoClearPassword"])]]), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", {
+      }, null, 8, ["model-value", "name", "placeholder", "title"]), [[Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["AutoClearPassword"])]]), __props.provider.supportsCustomEndpoint ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("div", _hoisted_7, [__props.availableModels.length ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createBlock"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CorePluginsAdmin_["Field"]), {
+        key: 0,
+        "model-value": (_props$configuration5 = __props.configuration) === null || _props$configuration5 === void 0 ? void 0 : _props$configuration5.model,
+        name: `model-${__props.provider.id}`,
+        title: Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_Model'),
+        options: Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(modelOptions),
+        "full-width": "",
+        uicontrol: "select",
+        "onUpdate:modelValue": _cache[2] || (_cache[2] = $event => emit('update:model', `${$event}`))
+      }, null, 8, ["model-value", "name", "title", "options"])) : (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("p", _hoisted_8, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_ClickTestConnectionToShowAvailableModels')), 1)), __props.availableModels.length ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("button", {
+        key: 2,
+        class: "btn-flat ai-providers-refresh-models",
+        type: "button",
+        disabled: __props.isTesting || !Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(canTest),
+        title: Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_RefreshModels'),
+        onClick: _cache[3] || (_cache[3] = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withModifiers"])($event => emit('test'), ["prevent", "stop"]))
+      }, [_hoisted_10, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createTextVNode"])(" " + Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_RefreshModels')), 1)], 8, _hoisted_9)) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)])) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", {
         class: Object(external_commonjs_vue_commonjs2_vue_root_Vue_["normalizeClass"])([{
           'is-connected': __props.provider.configuration.isUsable
         }, "ai-providers-card-status"])
       }, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("span", {
         "aria-hidden": "true",
         class: Object(external_commonjs_vue_commonjs2_vue_root_Vue_["normalizeClass"])(["icon ai-providers-status-icon", __props.provider.configuration.isUsable ? 'icon-ok' : 'icon-minus'])
-      }, null, 2), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createTextVNode"])(" " + Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(__props.provider.configuration.isUsable ? Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_StatusConnected') : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_StatusNotConnected')), 1)], 2), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", _hoisted_7, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("button", {
+      }, null, 2), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createTextVNode"])(" " + Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(__props.provider.configuration.isUsable ? Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_StatusConnected') : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_StatusNotConnected')), 1)], 2), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", _hoisted_11, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("button", {
         class: "btn btn-small",
         type: "button",
-        disabled: __props.isTesting || !Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(hasPendingKey) && !__props.provider.configuration.hasApiKey,
-        onClick: _cache[2] || (_cache[2] = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withModifiers"])($event => emit('test'), ["prevent", "stop"]))
-      }, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(__props.isTesting ? Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_TestingConnection') : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_TestConnection')), 9, _hoisted_8), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("button", {
+        disabled: __props.isTesting || !Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(canTest),
+        onClick: _cache[4] || (_cache[4] = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withModifiers"])($event => emit('test'), ["prevent", "stop"]))
+      }, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(__props.isTesting ? Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_TestingConnection') : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_TestConnection')), 9, _hoisted_12), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("button", {
         class: "btn-flat",
         type: "button",
         disabled: __props.isDisconnecting || !__props.provider.configuration.hasApiKey,
-        onClick: _cache[3] || (_cache[3] = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withModifiers"])($event => emit('disconnect'), ["prevent", "stop"]))
-      }, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(__props.isDisconnecting ? Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_Disconnecting') : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_Disconnect')), 9, _hoisted_9)])], 64)) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)])], 42, _hoisted_1);
+        onClick: _cache[5] || (_cache[5] = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withModifiers"])($event => emit('disconnect'), ["prevent", "stop"]))
+      }, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(__props.isDisconnecting ? Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_Disconnecting') : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_Disconnect')), 9, _hoisted_13)])], 64)) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)])], 42, _hoisted_1);
     };
   }
 }));
 // CONCATENATED MODULE: ./plugins/AIProviders/vue/src/components/ProviderCard.vue?vue&type=script&lang=ts&setup=true
  
-// EXTERNAL MODULE: ./plugins/AIProviders/vue/src/components/ProviderCard.vue?vue&type=style&index=0&id=795d013e&lang=less
-var ProviderCardvue_type_style_index_0_id_795d013e_lang_less = __webpack_require__("cd4b");
+// EXTERNAL MODULE: ./plugins/AIProviders/vue/src/components/ProviderCard.vue?vue&type=style&index=0&id=460335a0&lang=less
+var ProviderCardvue_type_style_index_0_id_460335a0_lang_less = __webpack_require__("2bcb");
 
 // CONCATENATED MODULE: ./plugins/AIProviders/vue/src/components/ProviderCard.vue
 
@@ -336,52 +380,48 @@ const ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_4 = {
   class: "ai-providers-page-subtitle"
 };
 const ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_5 = {
-  key: 0,
-  class: "ai-providers-selected-configuration"
-};
-const ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_6 = {
   class: "ai-providers"
 };
-const ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_7 = {
+const ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_6 = {
   class: "ai-providers-defaults-title"
 };
-const ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_8 = {
+const ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_7 = {
   class: "ai-providers-section"
 };
-const ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_9 = {
+const ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_8 = {
   class: "ai-providers-subsection-title"
 };
-const _hoisted_10 = {
+const ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_9 = {
   class: "ai-providers-section-help"
 };
-const _hoisted_11 = ["aria-label"];
-const _hoisted_12 = {
+const ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_10 = ["aria-label"];
+const ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_11 = {
   key: 1,
   class: "ai-providers-section"
 };
-const _hoisted_13 = {
+const ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_12 = {
   class: "ai-providers-subsection-title"
 };
-const _hoisted_14 = {
+const ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_13 = {
   class: "ai-providers-section-help"
 };
-const _hoisted_15 = ["aria-label"];
-const _hoisted_16 = {
+const _hoisted_14 = ["aria-label"];
+const _hoisted_15 = {
   class: "ai-providers-capability-header"
 };
-const _hoisted_17 = ["value"];
-const _hoisted_18 = {
+const _hoisted_16 = ["value"];
+const _hoisted_17 = {
   class: "ai-providers-capability-label"
 };
-const _hoisted_19 = {
+const _hoisted_18 = {
   key: 0,
   class: "ai-providers-capability-description"
 };
-const _hoisted_20 = {
+const _hoisted_19 = {
   key: 2,
   class: "ai-providers-footer"
 };
-const _hoisted_21 = ["disabled"];
+const _hoisted_20 = ["disabled"];
 
 
 
@@ -395,6 +435,9 @@ const _hoisted_21 = ["disabled"];
     const defaultProviderId = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["ref"])('');
     const defaultCapabilityLevel = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["ref"])('');
     const providerConfigurations = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["ref"])({});
+    // Models discovered per provider from the last "test connection"/refresh, used
+    // to populate the model picker.
+    const availableModels = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["ref"])({});
     const testingProviders = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["ref"])({});
     const disconnectingProviders = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["ref"])({});
     const providers = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["computed"])(() => {
@@ -410,7 +453,8 @@ const _hoisted_21 = ["disabled"];
       var _settings$value3;
       return !!((_settings$value3 = settings.value) !== null && _settings$value3 !== void 0 && _settings$value3.canEditProviderConfiguration);
     });
-    const selectedProvider = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["computed"])(() => providers.value.find(provider => provider.id === defaultProviderId.value));
+    // Snapshot of the saved state, used to detect unsaved changes.
+    const savedSnapshot = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["ref"])('');
     const capabilityLevelOptions = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["computed"])(() => {
       var _settings$value4;
       const capabilityLevels = ((_settings$value4 = settings.value) === null || _settings$value4 === void 0 ? void 0 : _settings$value4.capabilityLevels) || {};
@@ -420,13 +464,15 @@ const _hoisted_21 = ["disabled"];
         description: keys.description ? Object(external_CoreHome_["translate"])(keys.description) : ''
       }));
     });
-    const selectedCapabilityLevel = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["computed"])(() => capabilityLevelOptions.value.find(capability => capability.id === defaultCapabilityLevel.value));
-    const selectedConfigurationLabel = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["computed"])(() => {
-      if (!selectedProvider.value || !selectedCapabilityLevel.value) {
-        return '';
-      }
-      return Object(external_CoreHome_["translate"])('AIProviders_SelectedConfiguration', selectedProvider.value.name, selectedCapabilityLevel.value.label);
-    });
+    // Serializes everything the user can edit, so it can be compared to the saved snapshot.
+    function serializeEditableState() {
+      return JSON.stringify({
+        defaultProviderId: defaultProviderId.value,
+        defaultCapabilityLevel: defaultCapabilityLevel.value,
+        providerConfigurations: providerConfigurations.value
+      });
+    }
+    const hasUnsavedChanges = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["computed"])(() => !!settings.value && serializeEditableState() !== savedSnapshot.value);
     /**
      * Applies the given settings to the component state.
      * @param nextSettings
@@ -437,12 +483,17 @@ const _hoisted_21 = ["disabled"];
       defaultCapabilityLevel.value = nextSettings.defaultCapabilityLevel;
       const nextProviderConfigurations = {};
       nextSettings.providers.forEach(provider => {
+        const savedModel = provider.configuration.model || '';
         nextProviderConfigurations[provider.id] = {
           apiKey: '',
-          endpointUrl: provider.configuration.endpointUrl || ''
+          endpointUrl: provider.configuration.endpointUrl || '',
+          model: savedModel
         };
       });
       providerConfigurations.value = nextProviderConfigurations;
+      availableModels.value = {};
+      // Capture the freshly applied state as the baseline for unsaved-change detection.
+      savedSnapshot.value = serializeEditableState();
     }
     function markProviderUsable(providerId) {
       if (!settings.value) {
@@ -468,6 +519,12 @@ const _hoisted_21 = ["disabled"];
       }
       return message.replace(/\s*#\d+\s+[\s\S]*$/, '').replace(/\s+/g, ' ').trim();
     }
+    // Notification IDs may only contain word characters (alphanumerics + underscore),
+    // see core/Notification/Manager.php::checkId(). Provider IDs can contain other
+    // characters (e.g. hyphens), so sanitize before using them in a notification ID.
+    function notificationId(id) {
+      return id.replace(/[^\w]/g, '_');
+    }
     function showErrorNotification(error, id) {
       const cleaned = getCleanErrorMessage(error);
       const isUseful = cleaned && cleaned !== 'Something went wrong';
@@ -479,6 +536,48 @@ const _hoisted_21 = ["disabled"];
         context: 'error'
       });
     }
+    function updateModel(providerId, model) {
+      providerConfigurations.value[providerId] = Object.assign(Object.assign({}, providerConfigurations.value[providerId]), {}, {
+        model
+      });
+    }
+    async function fetchAvailableModels(providerId, showNotifications) {
+      testingProviders.value[providerId] = true;
+      try {
+        const response = await external_CoreHome_["AjaxHelper"].post({
+          method: 'AIProviders.testConnection'
+        }, {
+          providerId,
+          providerConfiguration: JSON.stringify(providerConfigurations.value[providerId] || {})
+        }, {
+          withTokenInUrl: true,
+          createErrorNotification: false
+        });
+        markProviderUsable(providerId);
+        if (response.models && response.models.length) {
+          var _providerConfiguratio;
+          availableModels.value[providerId] = response.models;
+          // Default to the first discovered model when none is selected yet.
+          if (!((_providerConfiguratio = providerConfigurations.value[providerId]) !== null && _providerConfiguratio !== void 0 && _providerConfiguratio.model)) {
+            updateModel(providerId, response.models[0]);
+          }
+        }
+        if (showNotifications) {
+          external_CoreHome_["NotificationsStore"].show({
+            message: Object(external_CoreHome_["translate"])('AIProviders_TestConnectionSuccess', response.providerName),
+            type: 'transient',
+            id: notificationId(`aiProvidersTest-${providerId}`),
+            context: 'success'
+          });
+        }
+      } catch (error) {
+        if (showNotifications) {
+          showErrorNotification(error, notificationId(`aiProvidersTestError-${providerId}`));
+        }
+      } finally {
+        testingProviders.value[providerId] = false;
+      }
+    }
     async function loadSettings() {
       isLoading.value = true;
       try {
@@ -488,6 +587,9 @@ const _hoisted_21 = ["disabled"];
           createErrorNotification: false
         });
         applySettings(response);
+        response.providers.filter(provider => provider.supportsCustomEndpoint && provider.configuration.isUsable).forEach(provider => {
+          fetchAvailableModels(provider.id, false);
+        });
       } catch (error) {
         showErrorNotification(error, 'aiProvidersLoadError');
       } finally {
@@ -503,6 +605,7 @@ const _hoisted_21 = ["disabled"];
       providerConfigurations.value[providerId] = Object.assign(Object.assign({}, providerConfigurations.value[providerId]), {}, {
         endpointUrl
       });
+      availableModels.value[providerId] = [];
     }
     async function disconnectProvider(providerId) {
       disconnectingProviders.value[providerId] = true;
@@ -519,39 +622,17 @@ const _hoisted_21 = ["disabled"];
         external_CoreHome_["NotificationsStore"].show({
           message: Object(external_CoreHome_["translate"])('AIProviders_DisconnectSuccess'),
           type: 'transient',
-          id: `aiProvidersDisconnect-${providerId}`,
+          id: notificationId(`aiProvidersDisconnect-${providerId}`),
           context: 'success'
         });
       } catch (error) {
-        showErrorNotification(error, `aiProvidersDisconnectError-${providerId}`);
+        showErrorNotification(error, notificationId(`aiProvidersDisconnectError-${providerId}`));
       } finally {
         disconnectingProviders.value[providerId] = false;
       }
     }
     async function testConnection(providerId) {
-      testingProviders.value[providerId] = true;
-      try {
-        const response = await external_CoreHome_["AjaxHelper"].post({
-          method: 'AIProviders.testConnection'
-        }, {
-          providerId,
-          providerConfiguration: JSON.stringify(providerConfigurations.value[providerId] || {})
-        }, {
-          withTokenInUrl: true,
-          createErrorNotification: false
-        });
-        markProviderUsable(providerId);
-        external_CoreHome_["NotificationsStore"].show({
-          message: Object(external_CoreHome_["translate"])('AIProviders_TestConnectionSuccess', response.providerName, response.text),
-          type: 'transient',
-          id: `aiProvidersTest-${providerId}`,
-          context: 'success'
-        });
-      } catch (error) {
-        showErrorNotification(error, `aiProvidersTestError-${providerId}`);
-      } finally {
-        testingProviders.value[providerId] = false;
-      }
+      await fetchAvailableModels(providerId, true);
     }
     function cancelChanges() {
       if (settings.value) {
@@ -591,25 +672,31 @@ const _hoisted_21 = ["disabled"];
     }
     Object(external_commonjs_vue_commonjs2_vue_root_Vue_["onMounted"])(loadSettings);
     return (_ctx, _cache) => {
-      return Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("div", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_1, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("header", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_2, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("h2", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_3, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_MenuTitle')), 1), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("p", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_4, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_ConfigurationIntro')), 1), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(selectedConfigurationLabel) ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("span", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_5, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(selectedConfigurationLabel)), 1)) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)]), isLoading.value ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createBlock"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["ActivityIndicator"]), {
+      return Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("div", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_1, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("header", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_2, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("h2", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_3, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_MenuTitle')), 1), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("p", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_4, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_ConfigurationIntro')), 1)]), isLoading.value ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createBlock"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["ActivityIndicator"]), {
         key: 0,
         loading: isLoading.value
       }, null, 8, ["loading"])) : settings.value ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createBlock"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["ContentBlock"]), {
-        key: 1
+        key: 1,
+        class: "ai-providers-content"
       }, {
-        default: Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withCtx"])(() => [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withDirectives"])((Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("div", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_6, [!Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(canEditProviderConfiguration) ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createBlock"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["Alert"]), {
+        default: Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withCtx"])(() => [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("span", {
+          class: Object(external_commonjs_vue_commonjs2_vue_root_Vue_["normalizeClass"])(["ai-providers-unsaved-changes", {
+            'is-visible': Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(hasUnsavedChanges)
+          }])
+        }, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_UnsavedChanges')), 3), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withDirectives"])((Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("div", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_5, [!Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(canEditProviderConfiguration) ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createBlock"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["Alert"]), {
           key: 0,
           severity: "info"
         }, {
           default: Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withCtx"])(() => [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createTextVNode"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_CloudConfigurationHelp')), 1)]),
           _: 1
-        })) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("h3", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_7, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_DefaultsTitle')), 1), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("section", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_8, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("h4", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_9, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_DefaultProvider')), 1), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("p", _hoisted_10, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_DefaultProviderHelp')), 1), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", {
+        })) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("h3", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_6, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_DefaultsTitle')), 1), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("section", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_7, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("h4", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_8, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_DefaultProvider')), 1), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("p", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_9, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_DefaultProviderHelp')), 1), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", {
           "aria-label": Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_DefaultProvider'),
           class: "ai-providers-cards",
           role: "radiogroup"
         }, [(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(true), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])(external_commonjs_vue_commonjs2_vue_root_Vue_["Fragment"], null, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["renderList"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(providers), provider => {
           return Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createBlock"])(ProviderCard, {
             key: provider.id,
+            "available-models": availableModels.value[provider.id] || [],
             "can-edit": Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(canEditProviderConfiguration),
             configuration: providerConfigurations.value[provider.id],
             "is-disconnecting": !!disconnectingProviders.value[provider.id],
@@ -621,16 +708,17 @@ const _hoisted_21 = ["disabled"];
             onSelect: $event => provider.configuration.isUsable ? defaultProviderId.value = provider.id : null,
             onTest: $event => testConnection(provider.id),
             "onUpdate:apiKey": $event => updateApiKey(provider.id, $event),
-            "onUpdate:endpointUrl": $event => updateEndpointUrl(provider.id, $event)
-          }, null, 8, ["can-edit", "configuration", "is-disconnecting", "is-testing", "provider", "selected", "usable-as-default", "onDisconnect", "onSelect", "onTest", "onUpdate:apiKey", "onUpdate:endpointUrl"]);
-        }), 128))], 8, _hoisted_11), !Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(hasUsableProvider) ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createBlock"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["Alert"]), {
+            "onUpdate:endpointUrl": $event => updateEndpointUrl(provider.id, $event),
+            "onUpdate:model": $event => updateModel(provider.id, $event)
+          }, null, 8, ["available-models", "can-edit", "configuration", "is-disconnecting", "is-testing", "provider", "selected", "usable-as-default", "onDisconnect", "onSelect", "onTest", "onUpdate:apiKey", "onUpdate:endpointUrl", "onUpdate:model"]);
+        }), 128))], 8, ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_10), !Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(hasUsableProvider) ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createBlock"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["Alert"]), {
           key: 0,
           class: "ai-providers-default-warning",
           severity: "warning"
         }, {
           default: Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withCtx"])(() => [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createTextVNode"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_NoDefaultProviderWarning')), 1)]),
           _: 1
-        })) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)]), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(canEditCapabilityLevel) ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("section", _hoisted_12, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("h4", _hoisted_13, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_DefaultCapabilityLevel')), 1), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("p", _hoisted_14, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_DefaultCapabilityLevelHelp')), 1), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", {
+        })) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)]), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(canEditCapabilityLevel) ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("section", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_11, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("h4", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_12, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_DefaultCapabilityLevel')), 1), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("p", ManageAIProvidersvue_type_script_lang_ts_setup_true_hoisted_13, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_DefaultCapabilityLevelHelp')), 1), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", {
           "aria-label": Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_DefaultCapabilityLevel'),
           class: "ai-providers-capability-cards",
           role: "radiogroup"
@@ -640,30 +728,31 @@ const _hoisted_21 = ["disabled"];
             class: Object(external_commonjs_vue_commonjs2_vue_root_Vue_["normalizeClass"])([{
               'is-selected': defaultCapabilityLevel.value === capability.id
             }, "ai-providers-capability-card"])
-          }, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", _hoisted_16, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withDirectives"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("input", {
+          }, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", _hoisted_15, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withDirectives"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("input", {
             "onUpdate:modelValue": _cache[0] || (_cache[0] = $event => defaultCapabilityLevel.value = $event),
             value: capability.id,
             name: "defaultCapabilityLevel",
             type: "radio"
-          }, null, 8, _hoisted_17), [[external_commonjs_vue_commonjs2_vue_root_Vue_["vModelRadio"], defaultCapabilityLevel.value]]), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("span", _hoisted_18, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(capability.label), 1)]), capability.description ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("div", _hoisted_19, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(capability.description), 1)) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)], 2);
-        }), 128))], 8, _hoisted_15)])) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)])), [[Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CorePluginsAdmin_["Form"])]])]),
+          }, null, 8, _hoisted_16), [[external_commonjs_vue_commonjs2_vue_root_Vue_["vModelRadio"], defaultCapabilityLevel.value]]), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("span", _hoisted_17, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(capability.label), 1)]), capability.description ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("div", _hoisted_18, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(capability.description), 1)) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)], 2);
+        }), 128))], 8, _hoisted_14)])) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)])), [[Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CorePluginsAdmin_["Form"])]])]),
         _: 1
-      })) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true), settings.value ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("div", _hoisted_20, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("button", {
-        disabled: isSaving.value,
+      })) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true), settings.value ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("div", _hoisted_19, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("button", {
+        disabled: isSaving.value || !Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(hasUnsavedChanges),
         class: "btn btn-outline",
         type: "button",
         onClick: _cache[1] || (_cache[1] = $event => cancelChanges())
-      }, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('General_Cancel')), 9, _hoisted_21), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createVNode"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CorePluginsAdmin_["SaveButton"]), {
+      }, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('General_Cancel')), 9, _hoisted_20), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createVNode"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CorePluginsAdmin_["SaveButton"]), {
+        disabled: !Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(hasUnsavedChanges),
         saving: isSaving.value,
         onConfirm: _cache[2] || (_cache[2] = $event => saveSettings())
-      }, null, 8, ["saving"])])) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)]);
+      }, null, 8, ["disabled", "saving"])])) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)]);
     };
   }
 }));
 // CONCATENATED MODULE: ./plugins/AIProviders/vue/src/ManageAIProviders.vue?vue&type=script&lang=ts&setup=true
  
-// EXTERNAL MODULE: ./plugins/AIProviders/vue/src/ManageAIProviders.vue?vue&type=style&index=0&id=a772204a&lang=less
-var ManageAIProvidersvue_type_style_index_0_id_a772204a_lang_less = __webpack_require__("f4a9");
+// EXTERNAL MODULE: ./plugins/AIProviders/vue/src/ManageAIProviders.vue?vue&type=style&index=0&id=fe726658&lang=less
+var ManageAIProvidersvue_type_style_index_0_id_fe726658_lang_less = __webpack_require__("8aee");
 
 // CONCATENATED MODULE: ./plugins/AIProviders/vue/src/ManageAIProviders.vue
 

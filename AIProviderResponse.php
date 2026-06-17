@@ -50,14 +50,6 @@ class AIProviderResponse
     private $outputTokens;
 
     /**
-     * Decoded provider response, retained for trusted server-side callers that
-     * need to persist or re-parse provider-specific payloads.
-     *
-     * @var array<string, mixed>|null
-     */
-    private $rawResponse;
-
-    /**
      * Provider reasoning level that was actually applied.
      *
      * @var string
@@ -78,9 +70,6 @@ class AIProviderResponse
      */
     private $executionTimeMs;
 
-    /**
-     * @param array<string, mixed>|null $rawResponse
-     */
     public function __construct(
         string $providerId,
         string $providerName,
@@ -88,7 +77,6 @@ class AIProviderResponse
         string $text,
         ?int $inputTokens = null,
         ?int $outputTokens = null,
-        ?array $rawResponse = null,
         string $reasoningLevel = AIRequest::REASONING_NONE,
         bool $webSearchEnabled = false,
         ?int $executionTimeMs = null
@@ -99,7 +87,6 @@ class AIProviderResponse
         $this->text = $text;
         $this->inputTokens = $inputTokens;
         $this->outputTokens = $outputTokens;
-        $this->rawResponse = $rawResponse;
         $this->reasoningLevel = $reasoningLevel;
         $this->webSearchEnabled = $webSearchEnabled;
         $this->executionTimeMs = $executionTimeMs;
@@ -123,14 +110,6 @@ class AIProviderResponse
     public function getOutputTokens(): ?int
     {
         return $this->outputTokens;
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
-    public function getRawResponse(): ?array
-    {
-        return $this->rawResponse;
     }
 
     public function getReasoningLevel(): string
@@ -174,7 +153,6 @@ class AIProviderResponse
             'text' => $this->text,
             'inputTokens' => $this->inputTokens,
             'outputTokens' => $this->outputTokens,
-            'rawResponse' => $this->rawResponse,
             'reasoningLevel' => $this->reasoningLevel,
             'webSearchEnabled' => $this->webSearchEnabled,
             'executionTimeMs' => $this->executionTimeMs,

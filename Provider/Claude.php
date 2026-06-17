@@ -17,6 +17,7 @@ use Piwik\Plugins\AIProviders\AIRequest;
 class Claude extends AIProvider
 {
     private const DEFAULT_MODEL = 'claude-haiku-4-5';
+    private const ANTHROPIC_VERSION = '2023-06-01';
 
     public function __construct()
     {
@@ -62,7 +63,7 @@ class Claude extends AIProvider
         $response = $this->sendJsonRequest(
             $this->getEndpointUrl($configuration),
             [
-                'anthropic-version' => '2023-06-01',
+                'anthropic-version' => self::ANTHROPIC_VERSION,
                 'x-api-key' => $this->getApiKey($configuration),
             ],
             $payload
@@ -75,8 +76,31 @@ class Claude extends AIProvider
             $model,
             is_string($text) ? $text : '',
             isset($response['usage']['input_tokens']) ? (int) $response['usage']['input_tokens'] : null,
-            isset($response['usage']['output_tokens']) ? (int) $response['usage']['output_tokens'] : null,
-            $response
+            isset($response['usage']['output_tokens']) ? (int) $response['usage']['output_tokens'] : null
+        );
+    }
+
+    /**
+     * Validates credentials and reachability with a cheap models listing
+     * (`GET /v1/models`) instead of spending generation tokens.
+     *
+     * @see https://platform.claude.com/docs/en/api/models-list
+     * @param array<string, string> $configuration
+     */
+    public function verifyConnection(array $configuration): void
+    {
+        $modelsEndpoint = preg_replace(
+            '#/messages/?$#',
+            '/models',
+            $this->getEndpointUrl($configuration)
+        ) ?? $this->getEndpointUrl($configuration);
+
+        $this->sendGetRequest(
+            $modelsEndpoint,
+            [
+                'anthropic-version' => self::ANTHROPIC_VERSION,
+                'x-api-key' => $this->getApiKey($configuration),
+            ]
         );
     }
 }

@@ -12,12 +12,12 @@ declare(strict_types=1);
 namespace Piwik\Plugins\AIProviders\tests\Unit;
 
 use Piwik\Plugins\AIProviders\AIRequest;
-use Piwik\Tests\Framework\TestCase\UnitTestCase;
+use PHPUnit\Framework\TestCase;
 
 /**
  * @group AIProviders
  */
-class AIRequestTest extends UnitTestCase
+class AIRequestTest extends TestCase
 {
     public function testProvidesRequiredValuesAndSensibleDefaults(): void
     {

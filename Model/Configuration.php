@@ -144,6 +144,7 @@ class Configuration
                     'configuration' => [
                         'hasApiKey' => !empty($providerConfiguration['apiKey']),
                         'endpointUrl' => $providerConfiguration['endpointUrl'],
+                        'model' => $providerConfiguration['model'],
                         'isUsable' => $provider->isConfigured($providerConfiguration),
                     ],
                 ]);
@@ -192,13 +193,14 @@ class Configuration
      * never see credentials.
      *
      * @internal
-     * @return array{apiKey: string, endpointUrl: string}
+     * @return array{apiKey: string, endpointUrl: string, model: string}
      */
     public function getProviderConfiguration(string $providerId): array
     {
         $storedConfiguration = $this->getProviderConfigurations()[$providerId] ?? [
             'apiKey' => '',
             'endpointUrl' => '',
+            'model' => '',
         ];
         $configFileConfiguration = $this->getConfigFileProviderConfiguration($providerId);
 
@@ -209,6 +211,9 @@ class Configuration
             'endpointUrl' => $configFileConfiguration['endpointUrl'] !== ''
                 ? $configFileConfiguration['endpointUrl']
                 : $storedConfiguration['endpointUrl'],
+            'model' => $configFileConfiguration['model'] !== ''
+                ? $configFileConfiguration['model']
+                : $storedConfiguration['model'],
         ];
     }
 
@@ -241,6 +246,7 @@ class Configuration
                 $providerId
             ),
             'endpointUrl' => $this->getSubmittedEndpointUrl($submittedProviderConfiguration, $provider),
+            'model' => $this->getSubmittedModel($submittedProviderConfiguration, $provider),
         ];
     }
 
@@ -434,6 +440,9 @@ class Configuration
                 'endpointUrl' => isset($providerConfiguration['endpointUrl']) && is_string($providerConfiguration['endpointUrl'])
                     ? $providerConfiguration['endpointUrl']
                     : '',
+                'model' => isset($providerConfiguration['model']) && is_string($providerConfiguration['model'])
+                    ? $providerConfiguration['model']
+                    : '',
             ];
         }
 
@@ -484,6 +493,7 @@ class Configuration
 
             $apiKey = $this->getSubmittedApiKey($submittedProviderConfiguration, $existingProviderConfigurations, $providerId);
             $endpointUrl = $this->getSubmittedEndpointUrl($submittedProviderConfiguration, $provider);
+            $model = $this->getSubmittedModel($submittedProviderConfiguration, $provider);
 
             if ($apiKey === '' && $endpointUrl === '') {
                 continue;
@@ -492,6 +502,7 @@ class Configuration
             $providerConfigurations[$providerId] = [
                 'apiKey' => $apiKey,
                 'endpointUrl' => $endpointUrl,
+                'model' => $model,
             ];
         }
 
@@ -553,6 +564,25 @@ class Configuration
         }
 
         return $endpointUrl;
+    }
+
+    /**
+     * The model only applies to providers with a custom endpoint (the admin
+     * picks it from the server's discovered models); it is empty for fixed
+     * hosted providers, which use their own default model.
+     *
+     * @param array<string, mixed> $submittedProviderConfiguration
+     */
+    private function getSubmittedModel(array $submittedProviderConfiguration, AIProvider $provider): string
+    {
+        if (!$provider->supportsCustomEndpoint()) {
+            return '';
+        }
+
+        return isset($submittedProviderConfiguration['model'])
+            && is_string($submittedProviderConfiguration['model'])
+            ? trim($submittedProviderConfiguration['model'])
+            : '';
     }
 
     private function getFirstConfiguredProviderId(AIProvidersList $providers): string
@@ -628,13 +658,14 @@ class Configuration
      * Returns the provider connection settings supplied via the config file or
      * environment variables (see the class docblock for the exact keys).
      *
-     * @return array{apiKey: string, endpointUrl: string}
+     * @return array{apiKey: string, endpointUrl: string, model: string}
      */
     private function getConfigFileProviderConfiguration(string $providerId): array
     {
         return [
             'apiKey' => $this->getConfigFileValue($providerId, 'ApiKey', 'API_KEY'),
             'endpointUrl' => $this->getConfigFileValue($providerId, 'EndpointUrl', 'ENDPOINT_URL'),
+            'model' => $this->getConfigFileValue($providerId, 'Model', 'MODEL'),
         ];
     }
 

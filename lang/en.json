@@ -4,6 +4,7 @@
         "ApiKeyAlreadyConfiguredPlaceholder": "Enter a new key to replace the key.",
         "ApiKeyPlaceholder": "Enter your API key",
         "ClaudeDescription": "Anthropic Claude models.",
+        "ClickTestConnectionToShowAvailableModels": "Click test connection to show available models.",
         "CloudConfigurationHelp": "Provider connections are managed by Matomo Cloud. You can only change the default provider.",
         "ConfigurationIntro": "Configure AI providers and default AI behavior in Matomo.",
         "CustomProviderDescription": "Use your own OpenAI compatible endpoint.",
@@ -22,18 +23,21 @@
         "InstantCapability": "Instant",
         "InstantCapabilityDescription": "Fast and cost-effective for simple tasks.",
         "MenuTitle": "AI Providers",
+        "Model": "Model",
+        "ModelPlaceholder": "Enter the model name",
         "NoDefaultProviderWarning": "No AI provider can be set as the default yet. Connect a provider first.",
         "OpenAIDescription": "OpenAI models like GPT-5.5",
+        "RefreshModels": "Refresh models",
         "RequestFailed": "AI provider request failed: %s",
-        "SelectedConfiguration": "%1$s · %2$s",
         "SettingsSaveSuccess": "AI provider settings saved.",
         "StatusConnected": "Connected",
         "StatusNotConnected": "Not connected",
         "TestConnection": "Test connection",
-        "TestConnectionSuccess": "%1$s connection works. Response: %2$s",
+        "TestConnectionSuccess": "%1$s connection works.",
         "TestingConnection": "Testing...",
         "ThinkingCapability": "Thinking",
         "ThinkingCapabilityDescription": "Better reasoning for complex tasks.",
-        "UnexpectedError": "Unexpected error. Please check the Matomo server logs."
+        "UnexpectedError": "Unexpected error. Please check the Matomo server logs.",
+        "UnsavedChanges": "You have unsaved changes."
     }
 }

@@ -190,9 +190,6 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertSame('Because molecules scatter blue light more strongly.', $response->getText());
         $this->assertSame(12, $response->getInputTokens());
         $this->assertSame(7, $response->getOutputTokens());
-        $rawResponse = $response->getRawResponse();
-        $this->assertIsArray($rawResponse);
-        $this->assertSame(12, $rawResponse['usage']['prompt_tokens']);
         $this->assertSame(AIRequest::REASONING_NONE, $response->getReasoningLevel());
         $this->assertFalse($response->isWebSearchEnabled());
         $this->assertIsInt($response->getExecutionTimeMs());
@@ -642,7 +639,20 @@ class ConfigurationTest extends IntegrationTestCase
 
     public function testApiTestsConnectionWithUnsavedProviderConfiguration(): void
     {
-        $this->mockAIProviderResponse('Because molecules scatter blue light more strongly.');
+        Piwik::addAction('Http.sendHttpRequest', function (
+            string $url,
+            array $httpEventParams,
+            ?string &$response,
+            ?int &$status,
+            array &$headers
+        ): void {
+            $this->assertSame('https://api.openai.com/v1/models', $url);
+            $this->assertSame('GET', $httpEventParams['httpMethod']);
+
+            $response = (string) json_encode(['data' => [['id' => 'gpt-4.1-mini']]]);
+            $status = 200;
+            $headers = ['Content-Type' => 'application/json'];
+        });
 
         $response = $this->api->testConnection(
             'openai',
@@ -653,7 +663,7 @@ class ConfigurationTest extends IntegrationTestCase
         );
 
         $this->assertSame('openai', $response['providerId']);
-        $this->assertSame('Because molecules scatter blue light more strongly.', $response['text']);
+        $this->assertSame('OpenAI', $response['providerName']);
     }
 
     public function testApiRetriesTransientProviderErrors(): void
@@ -667,10 +677,10 @@ class ConfigurationTest extends IntegrationTestCase
             array &$headers
         ) use (&$requests): void {
             $this->assertSame(
-                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+                'https://generativelanguage.googleapis.com/v1beta/models',
                 $url
             );
-            $this->assertSame('POST', $httpEventParams['httpMethod']);
+            $this->assertSame('GET', $httpEventParams['httpMethod']);
 
             $requests++;
 
@@ -687,19 +697,7 @@ class ConfigurationTest extends IntegrationTestCase
                 return;
             }
 
-            $response = (string) json_encode([
-                'candidates' => [
-                    [
-                        'content' => [
-                            'parts' => [
-                                [
-                                    'text' => 'Because molecules scatter blue light more strongly.',
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-            ]);
+            $response = (string) json_encode(['models' => [['name' => 'models/gemini-2.5-flash']]]);
             $status = 200;
             $headers = ['Content-Type' => 'application/json'];
         });
@@ -714,7 +712,7 @@ class ConfigurationTest extends IntegrationTestCase
 
         $this->assertSame(2, $requests);
         $this->assertSame('gemini', $response['providerId']);
-        $this->assertSame('Because molecules scatter blue light more strongly.', $response['text']);
+        $this->assertSame('Gemini', $response['providerName']);
     }
 
     public function testDisconnectProviderRemovesStoredApiKey(): void

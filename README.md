@@ -12,6 +12,23 @@ The plugin stores the default provider, default capability level, and provider c
 
 On a managed environment, the default provider is forced and locked via the `[AIProviders] defaultProvider` config setting. There is nothing left to configure, so the AI Providers settings page and its admin menu entry are hidden entirely.
 
+### Custom provider and local LLM servers
+
+The generic custom provider talks to any **OpenAI-compatible** Chat Completions API. This includes hosted OpenAI-compatible services as well as local LLM servers such as Ollama, LM Studio, llama.cpp (`llama-server`), vLLM and LocalAI, which all expose the same `/v1/chat/completions` wire format.
+
+Two things matter when configuring it:
+
+- **API base URL.** Enter the URL up to and including the OpenAI-compatible API root — for most servers that is the `/v1` path. Matomo appends `/chat/completions` itself, so do not include it. Examples:
+  - Ollama: `http://localhost:11434/v1`
+  - LM Studio: `http://localhost:1234/v1`
+  - vLLM / llama.cpp: `http://localhost:8000/v1`
+
+  Note that the request leaves the Matomo server, not the browser. If Matomo runs in a container (e.g. Docker/ddev), `localhost` refers to the container — use the host gateway such as `host.docker.internal` instead.
+
+- **API key.** Optional for the custom provider. Many local servers run without authentication, so the key may be left blank; it is only sent (as `Authorization: Bearer …`) when provided.
+
+- **Model.** The "test connection" action probes `GET {base}/models` (rather than spending generation tokens) and populates the model picker from the result; the refresh button re-runs it. Pick the model to use, or type a name when the server does not expose a listing. The custom provider has **no built-in default model** — the model sent to the server is the per-request model (`AIRequest::withModel()`) if set, otherwise the saved configuration model. If neither is set, completions fail with a clear "no model configured" error rather than silently calling a wrong model.
+
 ### Config-file credentials
 
 Provider connection settings can also be supplied from the `[AIProviders]` config section or environment variables instead of the administration UI. Per field, a config-file/environment value wins over the database value:

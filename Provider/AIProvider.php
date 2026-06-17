@@ -15,7 +15,9 @@ use Exception;
 use Piwik\Http;
 use Piwik\Plugins\AIProviders\AIProviderResponse;
 use Piwik\Plugins\AIProviders\AIRequest;
-use RuntimeException;
+use Piwik\Plugins\AIProviders\Exception\AIProviderClientException;
+use Piwik\Plugins\AIProviders\Exception\AIProviderException;
+use Piwik\Plugins\AIProviders\Exception\AIProviderServerException;
 
 abstract class AIProvider
 {
@@ -102,22 +104,63 @@ abstract class AIProvider
     abstract public function complete(AIRequest $request, array $configuration): AIProviderResponse;
 
     /**
+     * Validates the given connection settings, throwing on failure.
+     *
+     * Used by the admin "test connection" flow before a configuration is
+     * stored. The default implementation proves the full round-trip with a
+     * tiny completion; providers that expose a cheaper auth/health endpoint
+     * (e.g. a models listing) should override this to avoid spending
+     * generation tokens. Returns normally when the connection works.
+     *
+     * @param array<string, string> $configuration
+     * @throws AIProviderException when the connection cannot be established
+     */
+    public function verifyConnection(array $configuration): void
+    {
+        $request = (new AIRequest('Reply with the single word: OK', 'AIProviders'))
+            ->withFeatureKey('test-connection')
+            ->withMaxTokens(16);
+
+        $response = $this->complete($request, $configuration);
+
+        if (trim($response->getText()) === '') {
+            throw new AIProviderServerException(sprintf('%s returned an empty response.', $this->getName()));
+        }
+    }
+
+    /**
+     * Returns the list of model identifiers the provider can serve with the
+     * given configuration, used to populate the model picker in the admin UI.
+     * The default implementation returns no models; providers that can discover
+     * them (e.g. an OpenAI-compatible `/models` listing) should override this.
+     *
+     * @param array<string, string> $configuration
+     * @return list<string>
+     */
+    public function listModels(array $configuration): array
+    {
+        return [];
+    }
+
+    /**
      * Returns whether the provider has everything it needs to run completions.
      *
-     * The default implementation requires an API key, plus a custom endpoint
-     * URL for providers that support one. Providers whose credentials are
-     * supplied by the environment (rather than stored configuration) should
-     * override this method.
+     * Providers that talk to a fixed hosted API require an API key. Providers
+     * that support a custom endpoint instead require the endpoint URL; their
+     * API key is optional, because local LLM servers (Ollama, LM Studio,
+     * llama.cpp, vLLM, …) commonly run with authentication disabled. Providers
+     * whose credentials are supplied by the environment (rather than stored
+     * configuration) should override this method.
      *
      * @param array<string, string> $configuration
      */
     public function isConfigured(array $configuration): bool
     {
-        if (trim($configuration['apiKey'] ?? '') === '') {
-            return false;
+        if ($this->supportsCustomEndpoint()) {
+            return trim($configuration['endpointUrl'] ?? '') !== '';
         }
 
-        return !$this->supportsCustomEndpoint() || trim($configuration['endpointUrl'] ?? '') !== '';
+        return trim($configuration['apiKey'] ?? '') !== '';
     }
 
     /**
@@ -158,15 +201,13 @@ abstract class AIProvider
     /**
      * @param int|null $inputTokens  Prompt tokens reported by the provider, if any.
      * @param int|null $outputTokens Completion tokens reported by the provider, if any.
-     * @param array<string, mixed>|null $rawResponse Decoded provider response, if available.
      */
     protected function buildResponse(
         AIRequest $request,
         string $model,
         string $text,
         ?int $inputTokens = null,
-        ?int $outputTokens = null,
-        ?array $rawResponse = null
+        ?int $outputTokens = null
     ): AIProviderResponse {
         return new AIProviderResponse(
             $this->getId(),
@@ -175,7 +216,6 @@ abstract class AIProvider
             trim($text),
             $inputTokens,
             $outputTokens,
-            $rawResponse,
             $this->getReasoningLevelUsed($request),
             $this->isWebSearchUsed($request),
             $this->lastRequestExecutionTimeMs
@@ -222,7 +262,7 @@ abstract class AIProvider
         $payload = [
             'model' => $model,
             'messages' => $messages,
-            'max_completion_tokens' => $request->getMaxTokens(),
+            'max_tokens' => $request->getMaxTokens(),
             'temperature' => $request->getTemperature(),
         ];
 
@@ -239,8 +279,7 @@ abstract class AIProvider
             $model,
             is_string($text) ? $text : '',
             isset($response['usage']['prompt_tokens']) ? (int) $response['usage']['prompt_tokens'] : null,
-            isset($response['usage']['completion_tokens']) ? (int) $response['usage']['completion_tokens'] : null,
-            $response
+            isset($response['usage']['completion_tokens']) ? (int) $response['usage']['completion_tokens'] : null
         );
     }
 
@@ -272,10 +311,26 @@ abstract class AIProvider
         $apiKey = trim($configuration['apiKey'] ?? '');
 
         if ($apiKey === '') {
-            throw new RuntimeException(sprintf('No API key is configured for %s.', $this->getName()));
+            throw new AIProviderClientException(sprintf('No API key is configured for %s.', $this->getName()));
         }
 
         return $apiKey;
+    }
+
+    /**
+     * Builds the bearer Authorization header for OpenAI-compatible providers,
+     * omitting it entirely when no API key is configured. This lets custom
+     * endpoints point at local LLM servers that run without authentication
+     * while still sending the key when one is provided.
+     *
+     * @param array<string, string> $configuration
+     * @return array<string, string>
+     */
+    protected function getBearerAuthorizationHeaders(array $configuration): array
+    {
+        $apiKey = trim($configuration['apiKey'] ?? '');
+
+        return $apiKey === '' ? [] : ['Authorization' => 'Bearer ' . $apiKey];
     }
 
     /**
@@ -292,7 +347,7 @@ abstract class AIProvider
         }
 
         if ($endpointUrl === '') {
-            throw new RuntimeException(sprintf('No endpoint URL is configured for %s.', $this->getName()));
+            throw new AIProviderClientException(sprintf('No endpoint URL is configured for %s.', $this->getName()));
         }
 
         $parsedUrl = parse_url($endpointUrl);
@@ -302,28 +357,81 @@ abstract class AIProvider
             !filter_var($endpointUrl, FILTER_VALIDATE_URL)
             || !in_array($scheme, ['http', 'https'], true)
         ) {
-            throw new RuntimeException(sprintf('The endpoint URL for %s is invalid.', $this->getName()));
+            throw new AIProviderClientException(sprintf('The endpoint URL for %s is invalid.', $this->getName()));
         }
 
         return $endpointUrl;
     }
 
     /**
+     * Derives the OpenAI-compatible models-listing endpoint from a chat
+     * completions endpoint, e.g. `.../v1/chat/completions` or a bare `.../v1`
+     * base both become `.../v1/models` — the standard `GET {base}/models`
+     * probe used by the "test connection" flow.
+     */
+    protected function openAiCompatibleModelsEndpoint(string $chatEndpointUrl): string
+    {
+        $base = preg_replace('#/chat/completions/?$#', '', $chatEndpointUrl) ?? $chatEndpointUrl;
+
+        return rtrim($base, '/') . '/models';
+    }
+
+    /**
      * Sends a JSON request to the provider and returns the decoded JSON object.
+     *
+     * Transient errors (HTTP 500/503) are retried with backoff. Failures are
+     * classified: {@link AIProviderClientException} for authentication and
+     * 4xx responses, {@link AIProviderServerException} for 5xx responses
+     * after retries, {@link AIProviderException} for transport and protocol
+     * failures.
      *
      * @param array<string, string> $headers
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    protected function sendJsonRequest(string $url, array $headers, array $payload): array
+    protected function sendJsonRequest(string $url, array $headers, array $payload, int $timeoutSeconds = 60): array
     {
         $requestBody = json_encode($payload);
 
         if (!is_string($requestBody)) {
-            throw new RuntimeException(sprintf('Could not encode request body for %s.', $this->getName()));
+            throw new AIProviderException(sprintf('Could not encode request body for %s.', $this->getName()));
         }
 
-        $requestHeaders = ['Content-Type: application/json'];
+        return $this->sendRequest('POST', $url, $headers, $requestBody, $timeoutSeconds);
+    }
+
+    /**
+     * Sends a GET request to the provider and returns the decoded JSON object,
+     * used by the "test connection" probe. Failures are classified exactly as
+     * in {@link sendJsonRequest()}.
+     *
+     * @param array<string, string> $headers
+     * @return array<string, mixed>
+     */
+    protected function sendGetRequest(string $url, array $headers, int $timeoutSeconds = 10): array
+    {
+        return $this->sendRequest('GET', $url, $headers, null, $timeoutSeconds);
+    }
+
+    /**
+     * Performs the actual HTTP exchange, retrying transient errors and
+     * classifying failures. Shared by {@link sendJsonRequest()} and
+     * {@link sendGetRequest()}.
+     *
+     * @param array<string, string> $headers
+     * @return array<string, mixed>
+     */
+    private function sendRequest(
+        string $method,
+        string $url,
+        array $headers,
+        ?string $requestBody,
+        int $timeoutSeconds
+    ): array {
+        $requestHeaders = [];
+        if ($requestBody !== null) {
+            $requestHeaders[] = 'Content-Type: application/json';
+        }
         foreach ($headers as $name => $value) {
             $requestHeaders[] = $name . ': ' . $value;
         }
@@ -336,7 +444,7 @@ abstract class AIProvider
                 $response = Http::sendHttpRequestBy(
                     Http::getTransportMethod(),
                     $url,
-                    30,
+                    max(1, $timeoutSeconds),
                     null,
                     null,
                     null,
@@ -345,14 +453,14 @@ abstract class AIProvider
                     false,
                     false,
                     true,
-                    'POST',
+                    $method,
                     null,
                     null,
                     $requestBody,
                     $requestHeaders
                 );
             } catch (Exception $e) {
-                throw new RuntimeException(sprintf(
+                throw new AIProviderException(sprintf(
                     'Could not connect to %s: %s',
                     $this->getName(),
                     $e->getMessage()
@@ -360,7 +468,7 @@ abstract class AIProvider
             }
 
             if (!is_array($response)) {
-                throw new RuntimeException(sprintf('%s returned an invalid response.', $this->getName()));
+                throw new AIProviderException(sprintf('%s returned an invalid response.', $this->getName()));
             }
 
             $status = (int) ($response['status'] ?? 0);
@@ -369,7 +477,7 @@ abstract class AIProvider
 
             if ($status >= 200 && $status < 300) {
                 if (!is_array($decoded)) {
-                    throw new RuntimeException(sprintf('%s returned invalid JSON.', $this->getName()));
+                    throw new AIProviderException(sprintf('%s returned invalid JSON.', $this->getName()));
                 }
 
                 $this->lastRequestExecutionTimeMs = (int) round((microtime(true) - $startedAt) * 1000);
@@ -380,7 +488,7 @@ abstract class AIProvider
             $providerError = $this->getProviderErrorMessage(is_array($decoded) ? $decoded : []);
 
             if ($this->isAuthenticationError($providerError)) {
-                throw new RuntimeException(sprintf(
+                throw new AIProviderClientException(sprintf(
                     '%s rejected the API key. Check the key and try again.',
                     $this->getName()
                 ));
@@ -392,10 +500,20 @@ abstract class AIProvider
             }
 
             $errorSuffix = $providerError !== '' ? ': ' . substr($providerError, 0, 300) : '';
-            throw new RuntimeException(sprintf('%s request failed%s.', $this->getName(), $errorSuffix));
+            $message = sprintf('%s request failed%s.', $this->getName(), $errorSuffix);
+
+            if ($status >= 500) {
+                throw new AIProviderServerException($message);
+            }
+
+            if ($status >= 400) {
+                throw new AIProviderClientException($message);
+            }
+
+            throw new AIProviderException($message);
         }
 
-        throw new RuntimeException(sprintf('%s request failed.', $this->getName()));
+        throw new AIProviderServerException(sprintf('%s request failed.', $this->getName()));
     }
 
     /**

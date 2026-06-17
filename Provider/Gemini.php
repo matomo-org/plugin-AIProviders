@@ -88,8 +88,22 @@ class Gemini extends AIProvider
             $model,
             is_string($text) ? $text : '',
             isset($response['usageMetadata']['promptTokenCount']) ? (int) $response['usageMetadata']['promptTokenCount'] : null,
-            isset($response['usageMetadata']['candidatesTokenCount']) ? (int) $response['usageMetadata']['candidatesTokenCount'] : null,
-            $response
+            isset($response['usageMetadata']['candidatesTokenCount']) ? (int) $response['usageMetadata']['candidatesTokenCount'] : null
+        );
+    }
+
+    /**
+     * Validates credentials and reachability with a cheap models listing
+     * instead of spending generation tokens.
+     *
+     * @see https://ai.google.dev/api/models#method:-models.list
+     * @param array<string, string> $configuration
+     */
+    public function verifyConnection(array $configuration): void
+    {
+        $this->sendGetRequest(
+            'https://generativelanguage.googleapis.com/v1beta/models',
+            ['x-goog-api-key' => $this->getApiKey($configuration)]
         );
     }
 

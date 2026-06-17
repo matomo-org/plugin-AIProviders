@@ -14,6 +14,7 @@ import type { Provider, ProviderConfiguration } from '../types';
 const props = defineProps<{
   provider: Provider;
   configuration: ProviderConfiguration | undefined;
+  availableModels: string[];
   selected: boolean;
   usableAsDefault: boolean;
   canEdit: boolean;
@@ -26,12 +27,26 @@ const emit = defineEmits<{
   (e: 'select'): void;
   (e: 'update:apiKey', value: string): void;
   (e: 'update:endpointUrl', value: string): void;
+  (e: 'update:model', value: string): void;
   (e: 'test'): void;
   (e: 'disconnect'): void;
 }>();
 /* eslint-enable func-call-spacing, no-spaced-func */
 
 const hasPendingKey = computed(() => (props.configuration?.apiKey ?? '') !== '');
+const hasEndpointUrl = computed(() => (props.configuration?.endpointUrl ?? '') !== '');
+
+// Custom endpoints may run without a key, so reaching the server only needs the
+// URL; fixed hosted providers need a key (pending or already stored).
+const canTest = computed(() => (props.provider.supportsCustomEndpoint
+  ? hasEndpointUrl.value
+  : hasPendingKey.value || props.provider.configuration.hasApiKey));
+
+const modelOptions = computed(() => {
+  const options: Record<string, string> = {};
+  props.availableModels.forEach((model) => { options[model] = model; });
+  return options;
+});
 
 function selectProvider() {
   if (props.usableAsDefault) {
@@ -96,6 +111,42 @@ function selectProvider() {
         />
 
         <div
+          v-if="provider.supportsCustomEndpoint"
+          class="ai-providers-card-model"
+        >
+          <Field
+            v-if="availableModels.length"
+            :model-value="configuration?.model"
+            :name="`model-${provider.id}`"
+            :title="translate('AIProviders_Model')"
+            :options="modelOptions"
+            full-width
+            uicontrol="select"
+            @update:model-value="emit('update:model', `${$event}`)"
+          />
+          <p
+            v-else
+            class="ai-providers-card-model-help"
+          >
+            {{ translate('AIProviders_ClickTestConnectionToShowAvailableModels') }}
+          </p>
+          <button
+            v-if="availableModels.length"
+            class="btn-flat ai-providers-refresh-models"
+            type="button"
+            :disabled="isTesting || !canTest"
+            :title="translate('AIProviders_RefreshModels')"
+            @click.prevent.stop="emit('test')"
+          >
+            <span
+              aria-hidden="true"
+              class="icon icon-reload"
+            ></span>
+            {{ translate('AIProviders_RefreshModels') }}
+          </button>
+        </div>
+
+        <div
           :class="{ 'is-connected': provider.configuration.isUsable }"
           class="ai-providers-card-status"
         >
@@ -115,7 +166,7 @@ function selectProvider() {
           <button
             class="btn btn-small"
             type="button"
-            :disabled="isTesting || (!hasPendingKey && !provider.configuration.hasApiKey)"
+            :disabled="isTesting || !canTest"
             @click.prevent.stop="emit('test')"
           >
             {{
@@ -204,6 +255,11 @@ function selectProvider() {
     left: 0 !important;
   }
 
+  .matomo-field-select > label,
+  .matomo-field-select > .select-wrapper + label {
+    left: 0 !important;
+  }
+
   .input-field > input {
     padding-left: 0;
     margin-left: 0;
@@ -232,7 +288,7 @@ function selectProvider() {
   color: #fff;
   font-size: 10px;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.5;
   text-transform: uppercase;
 }
 
@@ -254,6 +310,32 @@ function selectProvider() {
   font-size: 13px;
   line-height: 1.5;
   margin: 0 0 16px;
+}
+
+.ai-providers-refresh-models {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 0;
+  font-size: 12px;
+
+  &[disabled] {
+    pointer-events: none;
+    cursor: not-allowed;
+    color: var(--theme-color-text-on-disabled);
+  }
+
+  .icon-reload {
+    font-size: 12px;
+  }
+}
+
+.ai-providers-card-model-help {
+  color: var(--ai-providers-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
 }
 
 .ai-providers-card-status {

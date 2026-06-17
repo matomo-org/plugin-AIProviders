@@ -44,4 +44,18 @@ class OpenAI extends AIProvider
             ['Authorization' => 'Bearer ' . $this->getApiKey($configuration)]
         );
     }
+
+    /**
+     * Validates credentials and reachability with a cheap models listing
+     * (`GET /v1/models`) instead of spending generation tokens.
+     *
+     * @param array<string, string> $configuration
+     */
+    public function verifyConnection(array $configuration): void
+    {
+        $this->sendGetRequest(
+            $this->openAiCompatibleModelsEndpoint($this->getEndpointUrl($configuration)),
+            ['Authorization' => 'Bearer ' . $this->getApiKey($configuration)]
+        );
+    }
 }

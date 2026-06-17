@@ -18,10 +18,10 @@ import {
 import { Form as vForm, SaveButton } from 'CorePluginsAdmin';
 import ProviderCard from './components/ProviderCard.vue';
 import type {
-  AIProviderResponse,
   CapabilityLevelOption,
   ProviderConfiguration,
   Settings,
+  TestConnectionResponse,
 } from './types';
 
 const settings = ref<Settings | null>(null);
@@ -30,6 +30,9 @@ const isSaving = ref(false);
 const defaultProviderId = ref('');
 const defaultCapabilityLevel = ref('');
 const providerConfigurations = ref<Record<string, ProviderConfiguration>>({});
+// Models discovered per provider from the last "test connection"/refresh, used
+// to populate the model picker.
+const availableModels = ref<Record<string, string[]>>({});
 const testingProviders = ref<Record<string, boolean>>({});
 const disconnectingProviders = ref<Record<string, boolean>>({});
 
@@ -39,9 +42,9 @@ const hasUsableProvider = computed(() => providers.value.some(
 ));
 const canEditCapabilityLevel = computed(() => !!settings.value?.canEditCapabilityLevel);
 const canEditProviderConfiguration = computed(() => !!settings.value?.canEditProviderConfiguration);
-const selectedProvider = computed(() => providers.value.find((provider) => (
-  provider.id === defaultProviderId.value
-)));
+
+// Snapshot of the saved state, used to detect unsaved changes.
+const savedSnapshot = ref('');
 
 const capabilityLevelOptions = computed<CapabilityLevelOption[]>(() => {
   const capabilityLevels = settings.value?.capabilityLevels || {};
@@ -52,20 +55,19 @@ const capabilityLevelOptions = computed<CapabilityLevelOption[]>(() => {
     description: keys.description ? translate(keys.description) : '',
   }));
 });
-const selectedCapabilityLevel = computed(() => capabilityLevelOptions.value.find((capability) => (
-  capability.id === defaultCapabilityLevel.value
-)));
-const selectedConfigurationLabel = computed(() => {
-  if (!selectedProvider.value || !selectedCapabilityLevel.value) {
-    return '';
-  }
 
-  return translate(
-    'AIProviders_SelectedConfiguration',
-    selectedProvider.value.name,
-    selectedCapabilityLevel.value.label,
-  );
-});
+// Serializes everything the user can edit, so it can be compared to the saved snapshot.
+function serializeEditableState() {
+  return JSON.stringify({
+    defaultProviderId: defaultProviderId.value,
+    defaultCapabilityLevel: defaultCapabilityLevel.value,
+    providerConfigurations: providerConfigurations.value,
+  });
+}
+
+const hasUnsavedChanges = computed(() => (
+  !!settings.value && serializeEditableState() !== savedSnapshot.value
+));
 
 /**
  * Applies the given settings to the component state.
@@ -78,12 +80,18 @@ function applySettings(nextSettings: Settings) {
 
   const nextProviderConfigurations: Record<string, ProviderConfiguration> = {};
   nextSettings.providers.forEach((provider) => {
+    const savedModel = provider.configuration.model || '';
     nextProviderConfigurations[provider.id] = {
       apiKey: '',
       endpointUrl: provider.configuration.endpointUrl || '',
+      model: savedModel,
     };
   });
   providerConfigurations.value = nextProviderConfigurations;
+  availableModels.value = {};
+
+  // Capture the freshly applied state as the baseline for unsaved-change detection.
+  savedSnapshot.value = serializeEditableState();
 }
 
 function markProviderUsable(providerId: string) {
@@ -120,6 +128,13 @@ function getCleanErrorMessage(error: unknown) {
     .trim();
 }
 
+// Notification IDs may only contain word characters (alphanumerics + underscore),
+// see core/Notification/Manager.php::checkId(). Provider IDs can contain other
+// characters (e.g. hyphens), so sanitize before using them in a notification ID.
+function notificationId(id: string) {
+  return id.replace(/[^\w]/g, '_');
+}
+
 function showErrorNotification(error: unknown, id: string) {
   const cleaned = getCleanErrorMessage(error);
   const isUseful = cleaned && cleaned !== 'Something went wrong';
@@ -135,6 +150,62 @@ function showErrorNotification(error: unknown, id: string) {
   });
 }
 
+function updateModel(providerId: string, model: string) {
+  providerConfigurations.value[providerId] = {
+    ...providerConfigurations.value[providerId],
+    model,
+  };
+}
+
+async function fetchAvailableModels(providerId: string, showNotifications: boolean) {
+  testingProviders.value[providerId] = true;
+
+  try {
+    const response = await AjaxHelper.post<TestConnectionResponse>(
+      {
+        method: 'AIProviders.testConnection',
+      },
+      {
+        providerId,
+        providerConfiguration: JSON.stringify(providerConfigurations.value[providerId] || {}),
+      },
+      {
+        withTokenInUrl: true,
+        createErrorNotification: false,
+      },
+    );
+
+    markProviderUsable(providerId);
+
+    if (response.models && response.models.length) {
+      availableModels.value[providerId] = response.models;
+
+      // Default to the first discovered model when none is selected yet.
+      if (!providerConfigurations.value[providerId]?.model) {
+        updateModel(providerId, response.models[0]);
+      }
+    }
+
+    if (showNotifications) {
+      NotificationsStore.show({
+        message: translate(
+          'AIProviders_TestConnectionSuccess',
+          response.providerName,
+        ),
+        type: 'transient',
+        id: notificationId(`aiProvidersTest-${providerId}`),
+        context: 'success',
+      });
+    }
+  } catch (error) {
+    if (showNotifications) {
+      showErrorNotification(error, notificationId(`aiProvidersTestError-${providerId}`));
+    }
+  } finally {
+    testingProviders.value[providerId] = false;
+  }
+}
+
 async function loadSettings() {
   isLoading.value = true;
 
@@ -145,6 +216,11 @@ async function loadSettings() {
       createErrorNotification: false,
     });
     applySettings(response);
+    response.providers
+      .filter((provider) => provider.supportsCustomEndpoint && provider.configuration.isUsable)
+      .forEach((provider) => {
+        fetchAvailableModels(provider.id, false);
+      });
   } catch (error) {
     showErrorNotification(error, 'aiProvidersLoadError');
   } finally {
@@ -164,6 +240,7 @@ function updateEndpointUrl(providerId: string, endpointUrl: string) {
     ...providerConfigurations.value[providerId],
     endpointUrl,
   };
+  availableModels.value[providerId] = [];
 }
 
 async function disconnectProvider(providerId: string) {
@@ -187,51 +264,18 @@ async function disconnectProvider(providerId: string) {
     NotificationsStore.show({
       message: translate('AIProviders_DisconnectSuccess'),
       type: 'transient',
-      id: `aiProvidersDisconnect-${providerId}`,
+      id: notificationId(`aiProvidersDisconnect-${providerId}`),
       context: 'success',
     });
   } catch (error) {
-    showErrorNotification(error, `aiProvidersDisconnectError-${providerId}`);
+    showErrorNotification(error, notificationId(`aiProvidersDisconnectError-${providerId}`));
   } finally {
     disconnectingProviders.value[providerId] = false;
   }
 }
 
 async function testConnection(providerId: string) {
-  testingProviders.value[providerId] = true;
-
-  try {
-    const response = await AjaxHelper.post<AIProviderResponse>(
-      {
-        method: 'AIProviders.testConnection',
-      },
-      {
-        providerId,
-        providerConfiguration: JSON.stringify(providerConfigurations.value[providerId] || {}),
-      },
-      {
-        withTokenInUrl: true,
-        createErrorNotification: false,
-      },
-    );
-
-    markProviderUsable(providerId);
-
-    NotificationsStore.show({
-      message: translate(
-        'AIProviders_TestConnectionSuccess',
-        response.providerName,
-        response.text,
-      ),
-      type: 'transient',
-      id: `aiProvidersTest-${providerId}`,
-      context: 'success',
-    });
-  } catch (error) {
-    showErrorNotification(error, `aiProvidersTestError-${providerId}`);
-  } finally {
-    testingProviders.value[providerId] = false;
-  }
+  await fetchAvailableModels(providerId, true);
 }
 
 function cancelChanges() {
@@ -288,12 +332,6 @@ onMounted(loadSettings);
       <p class="ai-providers-page-subtitle">
         {{ translate('AIProviders_ConfigurationIntro') }}
       </p>
-      <span
-        v-if="selectedConfigurationLabel"
-        class="ai-providers-selected-configuration"
-      >
-        {{ selectedConfigurationLabel }}
-      </span>
     </header>
 
     <ActivityIndicator
@@ -301,7 +339,14 @@ onMounted(loadSettings);
       :loading="isLoading"
     />
 
-    <ContentBlock v-else-if="settings">
+    <template v-else-if="settings">
+      <ContentBlock class="ai-providers-content">
+      <span
+        class="ai-providers-unsaved-changes"
+        :class="{ 'is-visible': hasUnsavedChanges }"
+      >
+        {{ translate('AIProviders_UnsavedChanges') }}
+      </span>
       <div v-form class="ai-providers">
         <Alert
           v-if="!canEditProviderConfiguration"
@@ -330,6 +375,7 @@ onMounted(loadSettings);
             <ProviderCard
               v-for="provider in providers"
               :key="provider.id"
+              :available-models="availableModels[provider.id] || []"
               :can-edit="canEditProviderConfiguration"
               :configuration="providerConfigurations[provider.id]"
               :is-disconnecting="!!disconnectingProviders[provider.id]"
@@ -342,6 +388,7 @@ onMounted(loadSettings);
               @test="testConnection(provider.id)"
               @update:api-key="updateApiKey(provider.id, $event)"
               @update:endpoint-url="updateEndpointUrl(provider.id, $event)"
+              @update:model="updateModel(provider.id, $event)"
             />
           </div>
 
@@ -395,14 +442,15 @@ onMounted(loadSettings);
           </div>
         </section>
       </div>
-    </ContentBlock>
+      </ContentBlock>
+    </template>
 
     <div
       v-if="settings"
       class="ai-providers-footer"
     >
       <button
-        :disabled="isSaving"
+        :disabled="isSaving || !hasUnsavedChanges"
         class="btn btn-outline"
         type="button"
         @click="cancelChanges()"
@@ -410,6 +458,7 @@ onMounted(loadSettings);
         {{ translate('General_Cancel') }}
       </button>
       <SaveButton
+        :disabled="!hasUnsavedChanges"
         :saving="isSaving"
         @confirm="saveSettings()"
       />
@@ -419,6 +468,7 @@ onMounted(loadSettings);
 
 <style lang="less">
 .ai-providers-page {
+  position: relative;
   --ai-providers-border: var(--theme-color-border-light, #e0e0e0);
   --ai-providers-border-strong: var(--theme-color-border, #ccc);
   --ai-providers-accent: var(--theme-color-brand, #43a047);
@@ -446,19 +496,6 @@ onMounted(loadSettings);
   font-size: 14px;
   line-height: 1.5;
   margin: 4px 0 0;
-}
-
-.ai-providers-selected-configuration {
-  display: inline-block;
-  margin-top: 8px;
-  height: 24px;
-  padding: 0 10px;
-  border-radius: 12px;
-  background-color: #e4e4e4;
-  color: rgba(0, 0, 0, 0.6);
-  line-height: 24px;
-  font-size: 12px;
-  font-weight: 500;
 }
 
 .ai-providers-defaults-title {
@@ -535,6 +572,38 @@ onMounted(loadSettings);
   color: var(--ai-providers-text-muted);
   font-size: 13px;
   line-height: 1.5;
+}
+
+.ai-providers-content {
+  position: relative;
+}
+
+.ai-providers-unsaved-changes {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ai-providers-text-muted);
+  font-size: 12px;
+  font-style: italic;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 150ms ease;
+
+  &::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ai-providers-accent);
+  }
+
+  &.is-visible {
+    visibility: visible;
+    opacity: 1;
+  }
 }
 
 .ai-providers-footer {
