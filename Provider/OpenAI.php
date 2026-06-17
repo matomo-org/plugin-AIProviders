@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace Piwik\Plugins\AIProviders\Provider;
 
+use Piwik\Plugins\AIProviders\AIConversationRequest;
+use Piwik\Plugins\AIProviders\AIConversationResponse;
 use Piwik\Plugins\AIProviders\AIProviderResponse;
 use Piwik\Plugins\AIProviders\AIRequest;
 
@@ -55,6 +57,26 @@ class OpenAI extends AIProvider
     {
         $this->sendGetRequest(
             $this->openAiCompatibleModelsEndpoint($this->getEndpointUrl($configuration)),
+            ['Authorization' => 'Bearer ' . $this->getApiKey($configuration)]
+        );
+    }
+
+    public function supportsConversations(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Runs one conversational round-trip against the OpenAI Chat Completions API.
+     *
+     * @see https://platform.openai.com/docs/api-reference/chat/create
+     * @param array<string, string> $configuration
+     */
+    public function converse(AIConversationRequest $request, array $configuration): AIConversationResponse
+    {
+        return $this->converseChatCompletion(
+            $request,
+            $this->getEndpointUrl($configuration),
             ['Authorization' => 'Bearer ' . $this->getApiKey($configuration)]
         );
     }

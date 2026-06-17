@@ -91,3 +91,48 @@ $data = $response->getJsonData(); // array, or null if the model did not return 
 ```
 
 Each provider asks for JSON the best way it can — `response_format` (OpenAI-compatible), `responseMimeType` (Gemini) — and AIProviders always adds a system instruction to return a single JSON object, so it works for providers without a native option (for example Claude) too. The model can still occasionally return invalid JSON, so always handle a `null` from `getJsonData()`.
+
+## Conversations (multi-turn, tool calling)
+
+`complete()` is prompt-in/text-out. When your plugin maintains a back-and-forth conversation and dispatches tool calls itself (as AskMatomo does), use `AIConversationRequest` with `AIProviderService::converse()` instead. The service resolves the provider exactly like `complete()` (forced provider, allowlisted caller selection, then the configured default) and returns one assistant turn per call.
+
+```php
+use Piwik\Container\StaticContainer;
+use Piwik\Plugins\AIProviders\AIConversationRequest;
+use Piwik\Plugins\AIProviders\AIConversationResponse;
+use Piwik\Plugins\AIProviders\AIProviderService;
+
+$service = StaticContainer::get(AIProviderService::class);
+
+$messages = [
+    ['role' => 'user', 'content' => [['type' => 'text', 'text' => 'How many visits yesterday?']]],
+];
+
+$response = $service->converse(
+    (new AIConversationRequest($messages, 'YourPlugin'))
+        ->withSystemPrompt($systemPrompt)
+        ->withTools($toolCatalog) // optional; MCP-aligned shape, see below
+        ->withMaxTokens(2048)
+);
+
+if ($response->getStopReason() === AIConversationResponse::STOP_TOOL_USE) {
+    // Run the requested tool_use blocks, append this turn and the tool
+    // results to $messages, and call converse() again.
+}
+```
+
+Messages, tools, and the assistant's content all use one **provider-agnostic canonical shape** documented in [`CanonicalMessage`](CanonicalMessage.php). Each provider translates that shape to and from its own wire format inside `converse()`, so swapping the configured provider never changes how your plugin builds or stores a conversation. Running tools and appending their results to the history for the next call is the caller's responsibility — the service performs a single round-trip per call.
+
+`AIConversationResponse` exposes the assistant content blocks (`getContent()`), the stop reason mapped onto the `STOP_*` constants (`getStopReason()`), a text convenience (`getText()`), token usage, and the raw decoded provider response. Treat an unknown stop reason like `STOP_END_TURN`. Unlike `complete()`, an empty text turn is valid here: a turn may consist solely of `tool_use` blocks.
+
+Not every provider supports conversations. Gate conversational features on availability rather than calling `converse()` blindly:
+
+```php
+if (!$service->canConverse()) {
+    // Hide or disable the feature.
+}
+// When the reason matters for the UI:
+$availability = $service->getConversationAvailability(); // status + resolved provider
+```
+
+The same **hard rule** as for `AIRequest` applies: the values passed to `withProviderId()` and `withModel()` must come from plugin code constants or server-side configuration, never from request input.

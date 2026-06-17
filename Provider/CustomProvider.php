@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace Piwik\Plugins\AIProviders\Provider;
 
+use Piwik\Plugins\AIProviders\AIConversationRequest;
+use Piwik\Plugins\AIProviders\AIConversationResponse;
 use Piwik\Plugins\AIProviders\AIProviderResponse;
 use Piwik\Plugins\AIProviders\AIRequest;
 use Piwik\Plugins\AIProviders\Exception\AIProviderClientException;
@@ -85,6 +87,26 @@ class CustomProvider extends AIProvider
         sort($models);
 
         return $models;
+    }
+
+    public function supportsConversations(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Custom servers are expected to be OpenAI-compatible. The model comes from
+     * the request or the saved configuration (see {@link complete()}).
+     *
+     * @param array<string, string> $configuration
+     */
+    public function converse(AIConversationRequest $request, array $configuration): AIConversationResponse
+    {
+        return $this->converseChatCompletion(
+            $request->withModel($this->resolveConfiguredModel($request->getModel(), $configuration)),
+            $this->getChatCompletionsEndpoint($this->getEndpointUrl($configuration)),
+            $this->getBearerAuthorizationHeaders($configuration)
+        );
     }
 
     /**

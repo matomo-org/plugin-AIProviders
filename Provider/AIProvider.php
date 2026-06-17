@@ -13,12 +13,20 @@ namespace Piwik\Plugins\AIProviders\Provider;
 
 use Exception;
 use Piwik\Http;
+use Piwik\Plugins\AIProviders\AIConversationRequest;
+use Piwik\Plugins\AIProviders\AIConversationResponse;
 use Piwik\Plugins\AIProviders\AIProviderResponse;
 use Piwik\Plugins\AIProviders\AIRequest;
+use Piwik\Plugins\AIProviders\CanonicalMessage;
 use Piwik\Plugins\AIProviders\Exception\AIProviderClientException;
 use Piwik\Plugins\AIProviders\Exception\AIProviderException;
 use Piwik\Plugins\AIProviders\Exception\AIProviderServerException;
 
+/**
+ * @phpstan-import-type CanonicalMessageArray from CanonicalMessage
+ * @phpstan-import-type CanonicalContentBlockArray from CanonicalMessage
+ * @phpstan-import-type ToolCatalogEntryArray from AIConversationRequest
+ */
 abstract class AIProvider
 {
     private const TRANSIENT_ERROR_RETRY_DELAYS = [1, 2];
@@ -104,6 +112,37 @@ abstract class AIProvider
     abstract public function complete(AIRequest $request, array $configuration): AIProviderResponse;
 
     /**
+     * Returns whether the provider implements {@link converse()}: multi-turn
+     * conversations with tool calling. Callers should check
+     * {@link \Piwik\Plugins\AIProviders\AIProviderService::canConverse()}
+     * before offering conversational features.
+     */
+    public function supportsConversations(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Runs one conversational round-trip and returns the assistant's turn in
+     * the canonical shape (see {@link \Piwik\Plugins\AIProviders\CanonicalMessage}).
+     *
+     * Implementations must translate the canonical messages and the tool
+     * catalogue to their wire format, honour the request's system prompt,
+     * model, max tokens, temperature, and timeout, and map their stop-reason
+     * vocabulary to the AIConversationResponse::STOP_* constants where a
+     * mapping exists. Providers that override this method must also override
+     * {@link supportsConversations()} to return true.
+     *
+     * @param array<string, string> $configuration
+     */
+    public function converse(AIConversationRequest $request, array $configuration): AIConversationResponse
+    {
+        throw new AIProviderClientException(
+            sprintf('%s does not support multi-turn conversations.', $this->getName())
+        );
+    }
+
+    /**
      * Validates the given connection settings, throwing on failure.
      *
      * Used by the admin "test connection" flow before a configuration is
@@ -177,6 +216,17 @@ abstract class AIProvider
     }
 
     /**
+     * Returns the model to use for the conversation request, falling back to
+     * the provider default.
+     */
+    protected function resolveConversationModel(AIConversationRequest $request): string
+    {
+        $model = $request->getModel();
+
+        return $model !== null && $model !== '' ? $model : $this->getDefaultModel();
+    }
+
+    /**
      * Returns the system prompt for the request, augmented with a JSON-output
      * instruction when JSON mode is requested. Providers should use this rather
      * than reading the request's system prompt directly, so JSON mode works even
@@ -218,6 +268,30 @@ abstract class AIProvider
             $outputTokens,
             $this->getReasoningLevelUsed($request),
             $this->isWebSearchUsed($request),
+            $this->lastRequestExecutionTimeMs
+        );
+    }
+
+    /**
+     * @param list<CanonicalContentBlockArray> $content canonical assistant content blocks
+     * @param int|null $inputTokens  Prompt tokens reported by the provider, if any.
+     * @param int|null $outputTokens Completion tokens reported by the provider, if any.
+     */
+    protected function buildConversationResponse(
+        string $model,
+        array $content,
+        string $stopReason,
+        ?int $inputTokens = null,
+        ?int $outputTokens = null
+    ): AIConversationResponse {
+        return new AIConversationResponse(
+            $this->getId(),
+            $this->getName(),
+            $model,
+            $content,
+            $stopReason,
+            $inputTokens,
+            $outputTokens,
             $this->lastRequestExecutionTimeMs
         );
     }
@@ -281,6 +355,329 @@ abstract class AIProvider
             isset($response['usage']['prompt_tokens']) ? (int) $response['usage']['prompt_tokens'] : null,
             isset($response['usage']['completion_tokens']) ? (int) $response['usage']['completion_tokens'] : null
         );
+    }
+
+    /**
+     * Runs one conversational round-trip against an OpenAI-compatible Chat
+     * Completions endpoint.
+     *
+     * Shared by providers that speak the OpenAI `/chat/completions` wire format
+     * for multi-turn, tool-calling conversations. The canonical message shape
+     * is translated to OpenAI `messages` (system/user/assistant/tool roles,
+     * assistant `tool_calls` with JSON-string arguments, and one `tool` message
+     * per tool result), the tool catalogue to `tools`, and the response's
+     * `choices[0]` back to canonical content blocks with stop reasons mapped
+     * onto the AIConversationResponse::STOP_* constants.
+     *
+     * @see https://platform.openai.com/docs/api-reference/chat/create
+     * @param array<string, string> $headers Additional request headers, such as authentication.
+     */
+    protected function converseChatCompletion(AIConversationRequest $request, string $endpointUrl, array $headers): AIConversationResponse
+    {
+        $model = $this->resolveConversationModel($request);
+
+        $payload = [
+            'model' => $model,
+            'messages' => $this->canonicalMessagesToOpenAI($request->getMessages(), $request->getSystemPrompt()),
+            'max_tokens' => $request->getMaxTokens(),
+            'temperature' => $request->getTemperature(),
+        ];
+
+        $tools = $this->toolCatalogToOpenAI($request->getTools());
+        if ($tools !== null) {
+            $payload['tools'] = $tools;
+        }
+
+        $response = $this->sendJsonRequest($endpointUrl, $headers, $payload, $request->getTimeoutSeconds());
+
+        $message = is_array($response['choices'][0]['message'] ?? null) ? $response['choices'][0]['message'] : [];
+        $finishReason = is_string($response['choices'][0]['finish_reason'] ?? null)
+            ? $response['choices'][0]['finish_reason']
+            : '';
+
+        return $this->buildConversationResponse(
+            $model,
+            $this->openAIMessageToCanonical($message),
+            $this->mapOpenAIFinishReason($finishReason),
+            isset($response['usage']['prompt_tokens']) ? (int) $response['usage']['prompt_tokens'] : null,
+            isset($response['usage']['completion_tokens']) ? (int) $response['usage']['completion_tokens'] : null
+        );
+    }
+
+    /**
+     * @param list<CanonicalMessageArray> $messages canonical messages
+     * @return list<array<string, mixed>>
+     */
+    private function canonicalMessagesToOpenAI(array $messages, ?string $systemPrompt): array
+    {
+        $openAIMessages = [];
+
+        if ($systemPrompt !== null && $systemPrompt !== '') {
+            $openAIMessages[] = ['role' => 'system', 'content' => $systemPrompt];
+        }
+
+        foreach ($messages as $message) {
+            if ($message['role'] === 'assistant') {
+                $openAIMessages[] = $this->canonicalAssistantToOpenAI($message['content']);
+                continue;
+            }
+
+            if ($message['role'] === 'tool') {
+                // OpenAI expects one message per tool result, so a single
+                // canonical 'tool' message fans out into N 'tool' messages.
+                foreach ($this->canonicalToolResultsToOpenAI($message['content']) as $toolMessage) {
+                    $openAIMessages[] = $toolMessage;
+                }
+                continue;
+            }
+
+            // Canonical 'user' messages carry only text blocks.
+            $openAIMessages[] = ['role' => 'user', 'content' => $this->textBlocksToString($message['content'])];
+        }
+
+        return $openAIMessages;
+    }
+
+    /**
+     * @param list<CanonicalContentBlockArray> $content canonical assistant content blocks
+     * @return array<string, mixed>
+     */
+    private function canonicalAssistantToOpenAI(array $content): array
+    {
+        $toolCalls = [];
+        foreach (CanonicalMessage::toolUseBlocks($content) as $block) {
+            // tool_call.arguments must be a JSON string holding an object even
+            // when empty; json_encode collapses `[]` to `[]`, so coerce empty
+            // inputs to stdClass so the arguments string is `{}`.
+            $arguments = json_encode($block['input'] === [] ? new \stdClass() : $block['input']);
+            $toolCalls[] = [
+                'id' => $block['id'],
+                'type' => 'function',
+                'function' => [
+                    'name' => $block['name'],
+                    'arguments' => $arguments === false ? '{}' : $arguments,
+                ],
+            ];
+        }
+
+        // OpenAI requires the content key to be present even when tool_calls
+        // carry the turn; an empty string keeps it valid.
+        $message = ['role' => 'assistant', 'content' => $this->textBlocksToString($content)];
+
+        if ($toolCalls !== []) {
+            $message['tool_calls'] = $toolCalls;
+        }
+
+        return $message;
+    }
+
+    /**
+     * @param list<CanonicalContentBlockArray> $content canonical tool_result blocks
+     * @return list<array<string, mixed>>
+     */
+    private function canonicalToolResultsToOpenAI(array $content): array
+    {
+        $messages = [];
+        foreach ($content as $block) {
+            if (($block['type'] ?? null) !== 'tool_result') {
+                continue;
+            }
+            $toolUseId = $block['tool_use_id'] ?? null;
+            if (!is_string($toolUseId)) {
+                continue;
+            }
+            $structured = is_array($block['structuredContent'] ?? null) ? $block['structuredContent'] : null;
+            $mcpContent = is_array($block['content'] ?? null) ? $block['content'] : [];
+
+            $messages[] = [
+                'role' => 'tool',
+                'tool_call_id' => $toolUseId,
+                'content' => $this->toolResultContentToOpenAI($structured, $mcpContent),
+            ];
+        }
+
+        return $messages;
+    }
+
+    /**
+     * OpenAI tool messages carry a single string content. The tool's
+     * structured output, when present, is serialised; otherwise MCP text
+     * blocks are concatenated, with non-text blocks JSON-stringified so their
+     * data still reaches the model.
+     *
+     * @param array<string, mixed>|null $structured
+     * @param list<array<string, mixed>> $mcpContent
+     */
+    private function toolResultContentToOpenAI(?array $structured, array $mcpContent): string
+    {
+        if ($structured !== null) {
+            $serialised = json_encode($structured);
+
+            return $serialised === false ? '' : $serialised;
+        }
+
+        $parts = [];
+        foreach ($mcpContent as $block) {
+            if (!is_array($block)) {
+                continue;
+            }
+            if (($block['type'] ?? null) === 'text' && is_string($block['text'] ?? null)) {
+                $parts[] = $block['text'];
+                continue;
+            }
+            $serialised = json_encode($block);
+            if ($serialised !== false) {
+                $parts[] = $serialised;
+            }
+        }
+
+        return implode("\n", $parts);
+    }
+
+    /**
+     * Concatenates the text blocks of a canonical content list, ignoring any
+     * non-text blocks. Returns '' when there are none.
+     *
+     * @param list<CanonicalContentBlockArray> $content
+     */
+    private function textBlocksToString(array $content): string
+    {
+        $parts = [];
+        foreach ($content as $block) {
+            if (($block['type'] ?? null) === 'text' && is_string($block['text'] ?? null)) {
+                $parts[] = $block['text'];
+            }
+        }
+
+        return implode("\n", $parts);
+    }
+
+    /**
+     * @param list<ToolCatalogEntryArray> $tools
+     * @return list<array{type: string, function: array<string, mixed>}>|null
+     */
+    private function toolCatalogToOpenAI(array $tools): ?array
+    {
+        if ($tools === []) {
+            return null;
+        }
+
+        $openAITools = [];
+        foreach ($tools as $tool) {
+            $openAITools[] = [
+                'type' => 'function',
+                'function' => [
+                    'name' => $tool['name'],
+                    'description' => $tool['description'],
+                    'parameters' => $this->toToolParametersObjectSchema($tool['inputSchema']),
+                ],
+            ];
+        }
+
+        return $openAITools;
+    }
+
+    /**
+     * Makes a tool's parameter schema acceptable to OpenAI and Gemini.
+     *
+     * Both reject certain keywords at the top level of the schema
+     * (`oneOf`/`anyOf`/`allOf`/`not`/`enum`/`const`), so this method strips them and
+     * forces a plain top-level `type: object`.
+     *
+     * These are only validation hints, and the tool server re-validates arguments
+     * on the actual call, so nothing is really loosened. Nested property schemas
+     * are left untouched, and `additionalProperties` are kept on purpose
+     * (OpenAI's strict mode requires it).
+     *
+     * Claude and Bedrock accept the original schema and skip this entirely.
+     * Gemini is stricter and adds a deeper recursive strip on top, in
+     * {@see Gemini::geminiParameterSchema()}.
+     *
+     * @param array<string, mixed> $schema
+     * @return array<string, mixed>
+     */
+    protected function toToolParametersObjectSchema(array $schema): array
+    {
+        unset(
+            $schema['oneOf'],
+            $schema['anyOf'],
+            $schema['allOf'],
+            $schema['not'],
+            $schema['enum'],
+            $schema['const']
+        );
+
+        if (($schema['type'] ?? null) !== 'object') {
+            $schema['type'] = 'object';
+        }
+
+        return $schema;
+    }
+
+    /**
+     * @param array<string, mixed> $message OpenAI assistant message
+     * @return list<CanonicalContentBlockArray> canonical assistant content blocks
+     */
+    private function openAIMessageToCanonical(array $message): array
+    {
+        $canonical = [];
+
+        $text = $message['content'] ?? null;
+        if (is_string($text) && $text !== '') {
+            $canonical[] = ['type' => 'text', 'text' => $text];
+        }
+
+        $toolCalls = is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [];
+        foreach ($toolCalls as $toolCall) {
+            if (!is_array($toolCall)) {
+                continue;
+            }
+            $id = $toolCall['id'] ?? null;
+            $name = $toolCall['function']['name'] ?? null;
+            if (!is_string($id) || !is_string($name)) {
+                continue;
+            }
+
+            $arguments = $toolCall['function']['arguments'] ?? null;
+            $decoded = is_string($arguments) && $arguments !== '' ? json_decode($arguments, true) : [];
+            $input = [];
+            if (is_array($decoded)) {
+                foreach ($decoded as $key => $value) {
+                    if (is_string($key)) {
+                        $input[$key] = $value;
+                    }
+                }
+            }
+
+            $canonical[] = [
+                'type' => 'tool_use',
+                'id' => $id,
+                'name' => $name,
+                'input' => $input,
+            ];
+        }
+
+        return $canonical;
+    }
+
+    /**
+     * Maps an OpenAI `finish_reason` onto the canonical stop reasons, passing
+     * unknown values through unchanged.
+     */
+    private function mapOpenAIFinishReason(string $finishReason): string
+    {
+        switch ($finishReason) {
+            case 'tool_calls':
+                return AIConversationResponse::STOP_TOOL_USE;
+            case 'stop':
+                return AIConversationResponse::STOP_END_TURN;
+            case 'length':
+                return AIConversationResponse::STOP_MAX_TOKENS;
+            case 'content_filter':
+                return AIConversationResponse::STOP_GUARDRAIL_INTERVENED;
+            default:
+                return $finishReason;
+        }
     }
 
     /**

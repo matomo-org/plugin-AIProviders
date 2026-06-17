@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Piwik\Plugins\AIProviders;
 
 use InvalidArgumentException;
+use Piwik\Plugins\AIProviders\Exception\AIProviderClientException;
 use Piwik\Plugins\AIProviders\Model\Configuration;
 use Piwik\Plugins\AIProviders\Provider\AIProvider;
 
@@ -27,6 +28,15 @@ use Piwik\Plugins\AIProviders\Provider\AIProvider;
  */
 class AIProviderService
 {
+    /** Conversational features can run: provider configured and capable. */
+    public const CONVERSATION_READY = 'ready';
+
+    /** No conversation-capable provider is configured (missing credentials or no provider). */
+    public const CONVERSATION_NOT_CONFIGURED = 'not_configured';
+
+    /** A provider is selected but does not implement conversations. */
+    public const CONVERSATION_PROVIDER_UNSUPPORTED = 'provider_unsupported';
+
     /**
      * @var Configuration
      */
@@ -90,6 +100,97 @@ class AIProviderService
          * Not implemented yet.
          */
         return $response;
+    }
+
+    /**
+     * Runs one conversational round-trip (multi-turn messages plus optional
+     * tool calls) and returns the assistant's turn.
+     *
+     * The provider is resolved exactly like in {@link complete()}: forced
+     * provider, then the caller's requested provider when allowlisted, then
+     * the configured default. A provider that does not support conversations
+     * fails with a clear error instead of silently degrading; callers should
+     * gate conversational features on {@link canConverse()}.
+     *
+     * Unlike {@link complete()}, an empty text response is valid here: a turn
+     * may consist solely of tool_use blocks.
+     */
+    public function converse(AIConversationRequest $request): AIConversationResponse
+    {
+        $providers = AIProviders::getAvailableProviders();
+        $resolution = $this->resolveProviderId($request->getProviderId(), $request->getCallerPluginName(), $providers);
+
+        if ($resolution['stripRequestedModel']) {
+            $request = $request->withProviderId($resolution['providerId'])->withModel(null);
+        }
+
+        $provider = $this->requireProvider($providers, $resolution['providerId']);
+
+        if (!$provider->supportsConversations()) {
+            throw new AIProviderClientException(sprintf(
+                '%s does not support multi-turn conversations.',
+                $provider->getName()
+            ));
+        }
+
+        $configuration = $this->configuration->getProviderConfiguration($provider->getId());
+
+        // TODO: publish the same `AIProviders.usage` observability event as
+        // planned for complete() once it is implemented there.
+        return $provider->converse($request, $configuration);
+    }
+
+    /**
+     * Returns whether conversational features can run right now: the default
+     * provider (honouring a managed environment's forced provider) exists, is
+     * configured, and supports conversations. Plugins offering chat-style
+     * features should hide or disable themselves when this returns false; use
+     * {@link getConversationAvailability()} when the reason matters for the UI.
+     */
+    public function canConverse(): bool
+    {
+        return $this->getConversationAvailability()['status'] === self::CONVERSATION_READY;
+    }
+
+    /**
+     * Reports whether conversational features can run, and why not when they
+     * cannot, so callers can show an actionable message instead of a generic
+     * "not configured" notice.
+     *
+     * `status` is one of:
+     * - {@link CONVERSATION_READY}: the default provider exists, supports
+     *   conversations, and is configured.
+     * - {@link CONVERSATION_PROVIDER_UNSUPPORTED}: a provider is selected but
+     *   does not implement conversations (for example a completion-only
+     *   provider). The fix is to switch providers, so this wins over a missing
+     *   configuration.
+     * - {@link CONVERSATION_NOT_CONFIGURED}: the conversation-capable provider
+     *   has no credentials yet, or no provider could be resolved.
+     *
+     * `providerId`/`providerName` identify the resolved provider when one
+     * exists, so the message can name it.
+     *
+     * @return array{status: string, providerId: ?string, providerName: ?string}
+     */
+    public function getConversationAvailability(): array
+    {
+        try {
+            $provider = $this->getDefaultProvider();
+        } catch (InvalidArgumentException $e) {
+            return ['status' => self::CONVERSATION_NOT_CONFIGURED, 'providerId' => null, 'providerName' => null];
+        }
+
+        $base = ['providerId' => $provider->getId(), 'providerName' => $provider->getName()];
+
+        if (!$provider->supportsConversations()) {
+            return ['status' => self::CONVERSATION_PROVIDER_UNSUPPORTED] + $base;
+        }
+
+        if (!$provider->isConfigured($this->configuration->getProviderConfiguration($provider->getId()))) {
+            return ['status' => self::CONVERSATION_NOT_CONFIGURED] + $base;
+        }
+
+        return ['status' => self::CONVERSATION_READY] + $base;
     }
 
     /**
