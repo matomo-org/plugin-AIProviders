@@ -54,6 +54,15 @@ class CustomProviderConverseTest extends TestCase
         );
     }
 
+    public function testCompleteDisablesThinkingWhenThinkingBudgetIsZero(): void
+    {
+        $custom = new RecordingCustomProvider();
+
+        $custom->complete((new AIRequest('Recommend goals', 'Goals'))->withThinkingBudget(0), self::CONFIGURATION);
+
+        $this->assertFalse($custom->sentPayload['think']);
+    }
+
     public function testEndpointWithChatCompletionsSuffixIsLeftIntact(): void
     {
         $custom = new RecordingCustomProvider();

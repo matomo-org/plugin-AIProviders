@@ -24,7 +24,7 @@ use Piwik\Plugins\AIProviders\CanonicalMessage;
  */
 class Gemini extends AIProvider
 {
-    private const DEFAULT_MODEL = 'gemini-2.5-flash';
+    private const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
 
     public function __construct()
     {
@@ -63,6 +63,9 @@ class Gemini extends AIProvider
             'generationConfig' => [
                 'maxOutputTokens' => $request->getMaxTokens(),
                 'temperature' => $request->getTemperature(),
+                'thinkingConfig' => [
+                    'thinkingBudget' => $this->wantsThinking($request) ? $this->thinkingBudget($request) : 0,
+                ],
             ],
         ];
 

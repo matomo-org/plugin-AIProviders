@@ -69,6 +69,11 @@ class AIProviderService
      */
     public function complete(AIRequest $request): AIProviderResponse
     {
+        // use the capability level set in the admin ui, unless overwritten through the request
+        if ($request->getCapabilityLevel() === null) {
+            $request = $request->withCapabilityLevel($this->configuration->getDefaultCapabilityLevel());
+        }
+
         $providers = AIProviders::getAvailableProviders();
         $resolution = $this->resolveProviderId($request->getProviderId(), $request->getCallerPluginName(), $providers);
 

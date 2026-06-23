@@ -373,7 +373,7 @@ class GeminiConverseTest extends TestCase
         $this->assertSame(12, $response->getInputTokens());
         $this->assertSame(7, $response->getOutputTokens());
         $this->assertSame('gemini', $response->getProviderId());
-        $this->assertSame('gemini-2.5-flash', $response->getModel());
+        $this->assertSame('gemini-2.5-flash-lite', $response->getModel());
     }
 
     public function testSynthesizedIdResolvesBackToFunctionNameOnFollowUpTurn(): void

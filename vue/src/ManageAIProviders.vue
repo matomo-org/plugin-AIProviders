@@ -5,13 +5,14 @@
   @license https://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
 -->
 
-<script lang="ts" setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import {
   ActivityIndicator,
   AjaxHelper,
   Alert,
   ContentBlock,
+  EnrichedHeadline,
   NotificationsStore,
   translate,
 } from 'CoreHome';
@@ -328,7 +329,11 @@ onMounted(loadSettings);
 <template>
   <div class="ai-providers-page">
     <header class="ai-providers-page-header">
-      <h2 class="ai-providers-page-title">{{ translate('AIProviders_MenuTitle') }}</h2>
+      <h2 class="ai-providers-page-title">
+        <EnrichedHeadline>
+          {{ translate('AIProviders_MenuTitle') }}
+        </EnrichedHeadline>
+      </h2>
       <p class="ai-providers-page-subtitle">
         {{ translate('AIProviders_ConfigurationIntro') }}
       </p>
@@ -451,7 +456,7 @@ onMounted(loadSettings);
     >
       <button
         :disabled="isSaving || !hasUnsavedChanges"
-        class="btn btn-outline"
+        class="btn ai-providers-cancel"
         type="button"
         @click="cancelChanges()"
       >
@@ -613,5 +618,27 @@ onMounted(loadSettings);
   align-items: center;
   gap: 12px;
   margin-top: 24px;
+}
+
+.ai-providers-cancel {
+  background: transparent;
+  color: var(--theme-color-text, #2f3033);
+  border: 1px solid var(--ai-providers-border-strong);
+  box-shadow: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+
+  &:hover,
+  &:focus {
+    background: var(--theme-color-background-tinyContrast, #f2f2f2);
+    border-color: var(--theme-color-text-light, #666);
+    color: var(--theme-color-text, #2f3033);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: transparent;
+    border-color: var(--ai-providers-border);
+  }
 }
 </style>

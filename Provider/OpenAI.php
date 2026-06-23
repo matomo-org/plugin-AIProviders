@@ -18,7 +18,7 @@ use Piwik\Plugins\AIProviders\AIRequest;
 
 class OpenAI extends AIProvider
 {
-    private const DEFAULT_MODEL = 'gpt-4.1-mini';
+    private const DEFAULT_MODEL = 'gpt-5.4-mini';
 
     public function __construct()
     {
@@ -64,6 +64,31 @@ class OpenAI extends AIProvider
     public function supportsConversations(): bool
     {
         return true;
+    }
+
+    /**
+     * gpt-5 reasoning models expose thinking through `reasoning_effort` rather
+     * than a thinking budget: "none" disables reasoning for fast, cheap instant
+     * answers; "medium" turns it on for better reasoning. (Supported because
+     * gpt-5.4-mini is post-gpt-5.1, where "none" became valid.)
+     */
+    protected function getExtraChatCompletionPayload(AIRequest $request): array
+    {
+        return ['reasoning_effort' => $this->wantsThinking($request) ? 'medium' : 'none'];
+    }
+
+    /**
+     * gpt-5 reasoning models require `max_completion_tokens` and reject a custom
+     * `temperature` (only the default is allowed), so omit it.
+     */
+    protected function chatCompletionTokenLimitField(): string
+    {
+        return 'max_completion_tokens';
+    }
+
+    protected function chatCompletionSupportsTemperature(): bool
+    {
+        return false;
     }
 
     /**

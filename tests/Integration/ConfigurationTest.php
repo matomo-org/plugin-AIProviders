@@ -239,8 +239,10 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertFalse($response->isWebSearchEnabled());
         $this->assertIsArray($capturedBody);
         $this->assertSame('gpt-4o-mini', $capturedBody['model']);
-        $this->assertSame(64, $capturedBody['max_tokens']);
-        $this->assertSame(0.5, $capturedBody['temperature']);
+        $this->assertSame(64, $capturedBody['max_completion_tokens']);
+        $this->assertArrayNotHasKey('max_tokens', $capturedBody);
+        $this->assertArrayNotHasKey('temperature', $capturedBody);
+        $this->assertSame('none', $capturedBody['reasoning_effort']);
         $this->assertSame(
             [
                 ['role' => 'system', 'content' => 'You are concise.'],
@@ -349,7 +351,7 @@ class ConfigurationTest extends IntegrationTestCase
             ->complete((new AIRequest('why is the sky blue', 'Test'))->withModel('claude-haiku-4-5'));
 
         $this->assertIsArray($capturedBody);
-        $this->assertSame('gpt-4.1-mini', $capturedBody['model']);
+        $this->assertSame('gpt-5.4-mini', $capturedBody['model']);
     }
 
     public function testAllowlistedCallerMaySelectProviderAndModelWhenProviderIsForced(): void

@@ -5,7 +5,7 @@
   @license https://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
 -->
 
-<script lang="ts" setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 import { AutoClearPassword as vAutoClearPassword, translate } from 'CoreHome';
 import { Field } from 'CorePluginsAdmin';

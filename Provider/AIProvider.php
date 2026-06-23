@@ -21,6 +21,7 @@ use Piwik\Plugins\AIProviders\CanonicalMessage;
 use Piwik\Plugins\AIProviders\Exception\AIProviderClientException;
 use Piwik\Plugins\AIProviders\Exception\AIProviderException;
 use Piwik\Plugins\AIProviders\Exception\AIProviderServerException;
+use Piwik\Plugins\AIProviders\Model\Configuration;
 
 /**
  * @phpstan-import-type CanonicalMessageArray from CanonicalMessage
@@ -32,6 +33,13 @@ abstract class AIProvider
     private const TRANSIENT_ERROR_RETRY_DELAYS = [1, 2];
 
     private const JSON_RESPONSE_INSTRUCTION = 'Respond with a single valid JSON object and nothing else. Do not wrap it in Markdown code fences.';
+
+    /**
+     * Token budget given to provider-specific "thinking" when the thinking
+     * capability is requested without an explicit per-request budget. Kept well
+     * above Anthropic's 1024-token minimum so it is valid for every provider.
+     */
+    protected const DEFAULT_THINKING_BUDGET = 2048;
 
     /**
      * @var string
@@ -209,9 +217,10 @@ abstract class AIProvider
     {
         $model = $request->getModel();
 
-        // TODO: Map capability levels to provider-specific models once the
-        // model choices are confirmed. Callers can still override the model
-        // explicitly per request for now.
+        // The capability level (instant/thinking) is not a different model: each
+        // provider's default model handles both, toggled by provider-specific
+        // thinking parameters (see wantsThinking()). An explicit per-request
+        // model still wins.
         return $model !== null && $model !== '' ? $model : $this->getDefaultModel();
     }
 
@@ -257,7 +266,8 @@ abstract class AIProvider
         string $model,
         string $text,
         ?int $inputTokens = null,
-        ?int $outputTokens = null
+        ?int $outputTokens = null,
+        ?string $stopReason = null
     ): AIProviderResponse {
         return new AIProviderResponse(
             $this->getId(),
@@ -268,7 +278,8 @@ abstract class AIProvider
             $outputTokens,
             $this->getReasoningLevelUsed($request),
             $this->isWebSearchUsed($request),
-            $this->lastRequestExecutionTimeMs
+            $this->lastRequestExecutionTimeMs,
+            $stopReason
         );
     }
 
@@ -298,10 +309,10 @@ abstract class AIProvider
 
     protected function getReasoningLevelUsed(AIRequest $request): string
     {
-        // TODO: Map AIRequest::getReasoningLevel() and getThinkingBudget() to
-        // provider-specific request fields once the supported models/formats
-        // are confirmed.
-        return AIRequest::REASONING_NONE;
+        // Reported back on the response so callers can see whether the request
+        // actually ran with thinking. Providers that enable thinking per the
+        // resolved capability level all map onto this single flag.
+        return $this->wantsThinking($request) ? Configuration::CAPABILITY_THINKING : AIRequest::REASONING_NONE;
     }
 
     protected function isWebSearchUsed(AIRequest $request): bool
@@ -336,9 +347,13 @@ abstract class AIProvider
         $payload = [
             'model' => $model,
             'messages' => $messages,
-            'max_tokens' => $request->getMaxTokens(),
-            'temperature' => $request->getTemperature(),
         ];
+        $payload[$this->chatCompletionTokenLimitField()] = $request->getMaxTokens();
+        if ($this->chatCompletionSupportsTemperature()) {
+            $payload['temperature'] = $request->getTemperature();
+        }
+
+        $payload = array_merge($payload, $this->getExtraChatCompletionPayload($request));
 
         if ($request->isJsonResponse()) {
             $payload['response_format'] = ['type' => 'json_object'];
@@ -347,14 +362,77 @@ abstract class AIProvider
         $response = $this->sendJsonRequest($endpointUrl, $headers, $payload);
 
         $text = $response['choices'][0]['message']['content'] ?? '';
+        $finishReason = is_string($response['choices'][0]['finish_reason'] ?? null)
+            ? $response['choices'][0]['finish_reason']
+            : null;
 
         return $this->buildResponse(
             $request,
             $model,
             is_string($text) ? $text : '',
             isset($response['usage']['prompt_tokens']) ? (int) $response['usage']['prompt_tokens'] : null,
-            isset($response['usage']['completion_tokens']) ? (int) $response['usage']['completion_tokens'] : null
+            isset($response['usage']['completion_tokens']) ? (int) $response['usage']['completion_tokens'] : null,
+            $finishReason
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function getExtraChatCompletionPayload(AIRequest $request): array
+    {
+        return [];
+    }
+
+    /**
+     * The Chat Completions field that bounds output length. Defaults to the
+     * classic `max_tokens`; OpenAI's reasoning models require
+     * `max_completion_tokens` instead.
+     */
+    protected function chatCompletionTokenLimitField(): string
+    {
+        return 'max_tokens';
+    }
+
+    /**
+     * Whether the provider accepts a custom `temperature`. Reasoning models
+     * (e.g. OpenAI's gpt-5 family) only allow the default temperature, so they
+     * override this to false and the field is omitted.
+     */
+    protected function chatCompletionSupportsTemperature(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Whether this request should run with the provider's "thinking" mode on.
+     *
+     * The capability level set on the request — or the configured default,
+     * applied by {@link \Piwik\Plugins\AIProviders\AIProviderService::complete()}
+     * — decides this, but an explicit per-request thinking budget always wins:
+     * a budget of 0 forces instant, a positive budget forces thinking. This is
+     * how a caller overrides the configured default for a single request (see
+     * {@link AIRequest::withThinkingBudget()}).
+     */
+    protected function wantsThinking(AIRequest $request): bool
+    {
+        $budget = $request->getThinkingBudget();
+        if ($budget !== null) {
+            return $budget > 0;
+        }
+
+        return $request->getCapabilityLevel() === Configuration::CAPABILITY_THINKING;
+    }
+
+    /**
+     * The thinking token budget to send when thinking is on: the caller's
+     * explicit positive budget, otherwise {@link self::DEFAULT_THINKING_BUDGET}.
+     */
+    protected function thinkingBudget(AIRequest $request): int
+    {
+        $budget = $request->getThinkingBudget();
+
+        return $budget !== null && $budget > 0 ? $budget : self::DEFAULT_THINKING_BUDGET;
     }
 
     /**
@@ -379,9 +457,11 @@ abstract class AIProvider
         $payload = [
             'model' => $model,
             'messages' => $this->canonicalMessagesToOpenAI($request->getMessages(), $request->getSystemPrompt()),
-            'max_tokens' => $request->getMaxTokens(),
-            'temperature' => $request->getTemperature(),
         ];
+        $payload[$this->chatCompletionTokenLimitField()] = $request->getMaxTokens();
+        if ($this->chatCompletionSupportsTemperature()) {
+            $payload['temperature'] = $request->getTemperature();
+        }
 
         $tools = $this->toolCatalogToOpenAI($request->getTools());
         if ($tools !== null) {
@@ -786,7 +866,7 @@ abstract class AIProvider
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    protected function sendJsonRequest(string $url, array $headers, array $payload, int $timeoutSeconds = 60): array
+    protected function sendJsonRequest(string $url, array $headers, array $payload, int $timeoutSeconds = 240): array
     {
         $requestBody = json_encode($payload);
 

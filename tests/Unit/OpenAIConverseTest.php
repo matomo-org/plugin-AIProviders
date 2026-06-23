@@ -36,9 +36,10 @@ class OpenAIConverseTest extends TestCase
 
         $this->assertSame('https://api.openai.com/v1/chat/completions', $openAI->sentUrl);
         $this->assertSame(['Authorization' => 'Bearer secret-openai-key'], $openAI->sentHeaders);
-        $this->assertSame('gpt-4.1-mini', $openAI->sentPayload['model']);
-        $this->assertSame(AIConversationRequest::DEFAULT_MAX_TOKENS, $openAI->sentPayload['max_tokens']);
-        $this->assertSame(AIRequest::DEFAULT_TEMPERATURE, $openAI->sentPayload['temperature']);
+        $this->assertSame('gpt-5.4-mini', $openAI->sentPayload['model']);
+        $this->assertSame(AIConversationRequest::DEFAULT_MAX_TOKENS, $openAI->sentPayload['max_completion_tokens']);
+        $this->assertArrayNotHasKey('max_tokens', $openAI->sentPayload);
+        $this->assertArrayNotHasKey('temperature', $openAI->sentPayload);
         $this->assertSame(AIConversationRequest::DEFAULT_TIMEOUT_SECONDS, $openAI->sentTimeoutSeconds);
         // No system prompt was set, so the messages start with the user turn.
         $this->assertSame(
@@ -61,8 +62,8 @@ class OpenAIConverseTest extends TestCase
         $openAI->converse($request, self::CONFIGURATION);
 
         $this->assertSame('gpt-4o', $openAI->sentPayload['model']);
-        $this->assertSame(512, $openAI->sentPayload['max_tokens']);
-        $this->assertSame(0.9, $openAI->sentPayload['temperature']);
+        $this->assertSame(512, $openAI->sentPayload['max_completion_tokens']);
+        $this->assertArrayNotHasKey('temperature', $openAI->sentPayload);
         $this->assertSame(120, $openAI->sentTimeoutSeconds);
         // The system prompt is prepended as the first message.
         $this->assertSame(
@@ -344,7 +345,7 @@ class OpenAIConverseTest extends TestCase
         $this->assertSame(7, $response->getOutputTokens());
         $this->assertSame('openai', $response->getProviderId());
         $this->assertSame('OpenAI', $response->getProviderName());
-        $this->assertSame('gpt-4.1-mini', $response->getModel());
+        $this->assertSame('gpt-5.4-mini', $response->getModel());
     }
 
     public function testBlankToolCallArgumentsDecodeToEmptyInput(): void

@@ -27,6 +27,11 @@ class Claude extends AIProvider
     private const DEFAULT_MODEL = 'claude-haiku-4-5';
     private const ANTHROPIC_VERSION = '2023-06-01';
 
+    // Anthropic requires budget_tokens >= 1024 and strictly < max_tokens; this
+    // headroom keeps room for the visible answer on top of the thinking budget.
+    private const THINKING_MIN_BUDGET = 1024;
+    private const THINKING_OUTPUT_HEADROOM = 1024;
+
     public function __construct()
     {
         parent::__construct('claude', 'Claude', 'AIProviders_ClaudeDescription');
@@ -63,6 +68,8 @@ class Claude extends AIProvider
             ],
         ];
 
+        $this->applyThinking($payload, $request);
+
         $systemPrompt = $this->getSystemPrompt($request);
         if ($systemPrompt !== null && $systemPrompt !== '') {
             $payload['system'] = $systemPrompt;
@@ -78,14 +85,39 @@ class Claude extends AIProvider
         );
 
         $text = $response['content'][0]['text'] ?? '';
+        $stopReason = is_string($response['stop_reason'] ?? null) ? $response['stop_reason'] : null;
 
         return $this->buildResponse(
             $request,
             $model,
             is_string($text) ? $text : '',
             isset($response['usage']['input_tokens']) ? (int) $response['usage']['input_tokens'] : null,
-            isset($response['usage']['output_tokens']) ? (int) $response['usage']['output_tokens'] : null
+            isset($response['usage']['output_tokens']) ? (int) $response['usage']['output_tokens'] : null,
+            $stopReason
         );
+    }
+
+    /**
+     * Turns on Anthropic extended thinking when the request resolves to the
+     * thinking capability. Enabling it has three wire requirements: the
+     * `thinking` block with a budget of at least 1024 tokens, a `max_tokens`
+     * strictly larger than that budget (bumped here when needed), and no custom
+     * `temperature` (only the default is allowed with thinking), so it is
+     * dropped. Instant requests leave the payload untouched.
+     *
+     * @param array<string, mixed> $payload
+     */
+    private function applyThinking(array &$payload, AIRequest $request): void
+    {
+        if (!$this->wantsThinking($request)) {
+            return;
+        }
+
+        $budget = max(self::THINKING_MIN_BUDGET, $this->thinkingBudget($request));
+
+        $payload['thinking'] = ['type' => 'enabled', 'budget_tokens' => $budget];
+        $payload['max_tokens'] = max($request->getMaxTokens(), $budget + self::THINKING_OUTPUT_HEADROOM);
+        unset($payload['temperature']);
     }
 
     /**

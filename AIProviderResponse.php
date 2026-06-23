@@ -70,6 +70,13 @@ class AIProviderResponse
      */
     private $executionTimeMs;
 
+    /**
+     * Provider stop reason, when available.
+     *
+     * @var string|null
+     */
+    private $stopReason;
+
     public function __construct(
         string $providerId,
         string $providerName,
@@ -79,7 +86,8 @@ class AIProviderResponse
         ?int $outputTokens = null,
         string $reasoningLevel = AIRequest::REASONING_NONE,
         bool $webSearchEnabled = false,
-        ?int $executionTimeMs = null
+        ?int $executionTimeMs = null,
+        ?string $stopReason = null
     ) {
         $this->providerId = $providerId;
         $this->providerName = $providerName;
@@ -90,6 +98,7 @@ class AIProviderResponse
         $this->reasoningLevel = $reasoningLevel;
         $this->webSearchEnabled = $webSearchEnabled;
         $this->executionTimeMs = $executionTimeMs;
+        $this->stopReason = $stopReason;
     }
 
     public function getText(): string
@@ -127,6 +136,11 @@ class AIProviderResponse
         return $this->executionTimeMs;
     }
 
+    public function getStopReason(): ?string
+    {
+        return $this->stopReason;
+    }
+
     /**
      * Returns the response text decoded as a JSON array/object, or null when the
      * text is not valid JSON. Intended for requests made with
@@ -136,9 +150,19 @@ class AIProviderResponse
      */
     public function getJsonData(): ?array
     {
-        $decoded = json_decode($this->text, true);
+        $decoded = json_decode($this->stripJsonCodeFence($this->text), true);
 
         return is_array($decoded) ? $decoded : null;
+    }
+
+    private function stripJsonCodeFence(string $text): string
+    {
+        $text = trim($text);
+        if (preg_match('/^```(?:json)?\s*(.*?)\s*```$/is', $text, $matches) === 1) {
+            return trim($matches[1]);
+        }
+
+        return $text;
     }
 
     /**
@@ -156,6 +180,7 @@ class AIProviderResponse
             'reasoningLevel' => $this->reasoningLevel,
             'webSearchEnabled' => $this->webSearchEnabled,
             'executionTimeMs' => $this->executionTimeMs,
+            'stopReason' => $this->stopReason,
         ];
     }
 }

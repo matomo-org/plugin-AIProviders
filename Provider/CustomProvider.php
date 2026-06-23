@@ -132,6 +132,14 @@ class CustomProvider extends AIProvider
         return $model;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    protected function getExtraChatCompletionPayload(AIRequest $request): array
+    {
+        return ['think' => $this->wantsThinking($request)];
+    }
+
     private function getChatCompletionsEndpoint(string $endpointUrl): string
     {
         if (preg_match('#/chat/completions/?$#', $endpointUrl)) {
