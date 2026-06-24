@@ -12,7 +12,10 @@ declare(strict_types=1);
 namespace Piwik\Plugins\AIProviders\Provider;
 
 use Exception;
+use Piwik\Container\StaticContainer;
+use Piwik\Development;
 use Piwik\Http;
+use Piwik\Log\LoggerInterface;
 use Piwik\Plugins\AIProviders\AIConversationRequest;
 use Piwik\Plugins\AIProviders\AIConversationResponse;
 use Piwik\Plugins\AIProviders\AIProviderResponse;
@@ -106,6 +109,11 @@ abstract class AIProvider
     public function getDefaultModel(): string
     {
         return '';
+    }
+
+    protected function isTrustedRequestHost(string $host): bool
+    {
+        return false;
     }
 
     /**
@@ -874,7 +882,7 @@ abstract class AIProvider
             throw new AIProviderException(sprintf('Could not encode request body for %s.', $this->getName()));
         }
 
-        return $this->sendRequest('POST', $url, $headers, $requestBody, $timeoutSeconds);
+        return $this->sendRequest('POST', $url, $headers, $requestBody, $timeoutSeconds, $payload);
     }
 
     /**
@@ -896,6 +904,7 @@ abstract class AIProvider
      * {@link sendGetRequest()}.
      *
      * @param array<string, string> $headers
+     * @param array<string, mixed>|null $debugPayload
      * @return array<string, mixed>
      */
     private function sendRequest(
@@ -903,7 +912,8 @@ abstract class AIProvider
         string $url,
         array $headers,
         ?string $requestBody,
-        int $timeoutSeconds
+        int $timeoutSeconds,
+        ?array $debugPayload = null
     ): array {
         $requestHeaders = [];
         if ($requestBody !== null) {
@@ -916,7 +926,20 @@ abstract class AIProvider
         $retryDelays = self::TRANSIENT_ERROR_RETRY_DELAYS;
         $startedAt = microtime(true);
 
+        $host = parse_url($url, PHP_URL_HOST);
+        $checkHostIsAllowed = !is_string($host) || !$this->isTrustedRequestHost($host);
+
         for ($attempt = 0; $attempt <= count($retryDelays); $attempt++) {
+            $attemptStartedAt = microtime(true);
+            $this->logProviderRequestDebugMetadata(
+                $method,
+                $url,
+                $timeoutSeconds,
+                strlen($requestBody ?? ''),
+                $attempt + 1,
+                $debugPayload
+            );
+
             try {
                 $response = Http::sendHttpRequestBy(
                     Http::getTransportMethod(),
@@ -934,9 +957,13 @@ abstract class AIProvider
                     null,
                     null,
                     $requestBody,
-                    $requestHeaders
+                    $requestHeaders,
+                    null,
+                    $checkHostIsAllowed
                 );
             } catch (Exception $e) {
+                $this->logProviderTransportDebugMetadata($method, $url, $timeoutSeconds, $attempt + 1, $e);
+
                 throw new AIProviderException(sprintf(
                     'Could not connect to %s: %s',
                     $this->getName(),
@@ -951,6 +978,17 @@ abstract class AIProvider
             $status = (int) ($response['status'] ?? 0);
             $body = is_string($response['data'] ?? null) ? $response['data'] : '';
             $decoded = $body !== '' ? json_decode($body, true) : null;
+
+            $this->logProviderResponseDebugMetadata(
+                $method,
+                $url,
+                $timeoutSeconds,
+                $status,
+                strlen($body),
+                (int) round((microtime(true) - $attemptStartedAt) * 1000),
+                $attempt + 1,
+                $debugPayload
+            );
 
             if ($status >= 200 && $status < 300) {
                 if (!is_array($decoded)) {
@@ -1012,6 +1050,153 @@ abstract class AIProvider
         }
 
         return $message;
+    }
+
+    /**
+     * Debug-only metadata for local provider testing. Intentionally does not
+     * log request/response content, headers, API keys, prompts, or model output.
+     *
+     * @param array<string, mixed>|null $payload
+     */
+    private function logProviderRequestDebugMetadata(
+        string $method,
+        string $url,
+        int $timeoutSeconds,
+        int $requestBytes,
+        int $attempt,
+        ?array $payload
+    ): void {
+        if (!Development::isEnabled()) {
+            return;
+        }
+
+        StaticContainer::get(LoggerInterface::class)->debug(
+            'AIProviders debug provider request metadata: provider={provider}, method={method}, '
+            . 'host={host}, path={path}, model={model}, thinking={thinking}, timeoutSeconds={timeoutSeconds}, '
+            . 'attempt={attempt}, requestBytes={requestBytes}',
+            array_merge($this->getProviderRequestDebugMetadata($url, $payload), [
+                'provider' => $this->getName(),
+                'method' => $method,
+                'timeoutSeconds' => $timeoutSeconds,
+                'attempt' => $attempt,
+                'requestBytes' => $requestBytes,
+            ])
+        );
+    }
+
+    /**
+     * @param array<string, mixed>|null $payload
+     */
+    private function logProviderResponseDebugMetadata(
+        string $method,
+        string $url,
+        int $timeoutSeconds,
+        int $status,
+        int $responseBytes,
+        int $durationMs,
+        int $attempt,
+        ?array $payload
+    ): void {
+        if (!Development::isEnabled()) {
+            return;
+        }
+
+        StaticContainer::get(LoggerInterface::class)->debug(
+            'AIProviders debug provider response metadata: provider={provider}, method={method}, '
+            . 'host={host}, path={path}, model={model}, thinking={thinking}, timeoutSeconds={timeoutSeconds}, '
+            . 'attempt={attempt}, status={status}, durationMs={durationMs}, responseBytes={responseBytes}',
+            array_merge($this->getProviderRequestDebugMetadata($url, $payload), [
+                'provider' => $this->getName(),
+                'method' => $method,
+                'timeoutSeconds' => $timeoutSeconds,
+                'attempt' => $attempt,
+                'status' => $status,
+                'durationMs' => $durationMs,
+                'responseBytes' => $responseBytes,
+            ])
+        );
+    }
+
+    private function logProviderTransportDebugMetadata(
+        string $method,
+        string $url,
+        int $timeoutSeconds,
+        int $attempt,
+        Exception $exception
+    ): void {
+        if (!Development::isEnabled()) {
+            return;
+        }
+
+        StaticContainer::get(LoggerInterface::class)->debug(
+            'AIProviders debug provider transport metadata: provider={provider}, method={method}, '
+            . 'host={host}, path={path}, timeoutSeconds={timeoutSeconds}, attempt={attempt}, '
+            . 'exceptionClass={exceptionClass}',
+            array_merge($this->getProviderRequestDebugMetadata($url, null), [
+                'provider' => $this->getName(),
+                'method' => $method,
+                'timeoutSeconds' => $timeoutSeconds,
+                'attempt' => $attempt,
+                'exceptionClass' => get_class($exception),
+            ])
+        );
+    }
+
+    /**
+     * @param array<string, mixed>|null $payload
+     * @return array{host: string, path: string, model: string, thinking: string}
+     */
+    private function getProviderRequestDebugMetadata(string $url, ?array $payload): array
+    {
+        $path = (string) parse_url($url, PHP_URL_PATH);
+
+        return [
+            'host' => (string) parse_url($url, PHP_URL_HOST),
+            'path' => $path,
+            'model' => $this->getDebugModel($payload, $path),
+            'thinking' => $this->getDebugThinking($payload),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed>|null $payload
+     */
+    private function getDebugModel(?array $payload, string $path): string
+    {
+        if (isset($payload['model']) && is_string($payload['model'])) {
+            return $payload['model'];
+        }
+
+        if (preg_match('~/models/([^/:]+)~', $path, $matches)) {
+            return $matches[1];
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<string, mixed>|null $payload
+     */
+    private function getDebugThinking(?array $payload): string
+    {
+        if ($payload === null) {
+            return 'unknown';
+        }
+
+        if (isset($payload['reasoning_effort']) && is_string($payload['reasoning_effort'])) {
+            return $payload['reasoning_effort'] === 'none' ? 'no' : 'yes';
+        }
+
+        if (isset($payload['thinking']) && is_array($payload['thinking'])) {
+            return 'yes';
+        }
+
+        $thinkingBudget = $payload['generationConfig']['thinkingConfig']['thinkingBudget'] ?? null;
+        if (is_int($thinkingBudget) || is_float($thinkingBudget)) {
+            return $thinkingBudget > 0 ? 'yes' : 'no';
+        }
+
+        return 'unknown';
     }
 
     private function isAuthenticationError(string $message): bool

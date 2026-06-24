@@ -357,7 +357,7 @@ onMounted(loadSettings);
           v-if="!canEditProviderConfiguration"
           severity="info"
         >
-          {{ translate('AIProviders_CloudConfigurationHelp') }}
+          {{ translate('AIProviders_ManagedConfigurationHelp') }}
         </Alert>
 
         <h3 class="ai-providers-defaults-title">
