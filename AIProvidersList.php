@@ -121,7 +121,7 @@ class AIProvidersList
      * {@link getSelectableProviders()} instead so restricted providers stay
      * hidden.
      *
-     * @return array<int, AIProvider>
+     * @return list<AIProvider>
      */
     public function getProviders(): array
     {
@@ -132,7 +132,7 @@ class AIProvidersList
      * Returns the providers that may be shown in the administration UI and
      * chosen as the default provider.
      *
-     * @return array<int, AIProvider>
+     * @return list<AIProvider>
      */
     public function getSelectableProviders(): array
     {

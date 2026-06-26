@@ -13,7 +13,6 @@ namespace Piwik\Plugins\AIProviders\tests\Integration;
 
 use Piwik\Config;
 use Piwik\Container\StaticContainer;
-use Piwik\Common;
 use Piwik\Piwik;
 use Piwik\Plugins\AIProviders\AIProvidersList;
 use Piwik\Plugins\AIProviders\AIRequest;
@@ -121,21 +120,29 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertStringNotContainsString('secret-claude-key', (string) json_encode($settings));
     }
 
-    public function testSaveSettingsAcceptsSanitizedJsonFromApiRequests(): void
+    public function testSaveSettingsKeepsApiKeyVerbatimWithoutSanitizing(): void
     {
+        // The API disables automatic input sanitization ($autoSanitizeInputParams
+        // = false), so a key containing characters that sanitization would
+        // HTML-encode must be stored byte-for-byte intact.
+        $apiKey = 'secret&claude<key>"123"';
+
         $settings = $this->api->saveSettings(
             'claude',
             Configuration::CAPABILITY_THINKING,
-            Common::sanitizeInputValue((string) json_encode([
+            (string) json_encode([
                 'claude' => [
-                    'apiKey' => 'secret-claude-key',
+                    'apiKey' => $apiKey,
                     'endpointUrl' => '',
                 ],
-            ]))
+            ])
         );
 
         $claude = $this->getProvider($settings, 'claude');
         $this->assertTrue($claude['configuration']['hasApiKey']);
+
+        $stored = StaticContainer::get(Configuration::class)->getProviderConfiguration('claude');
+        $this->assertSame($apiKey, $stored['apiKey']);
     }
 
     public function testSaveSettingsPreservesExistingApiKeyWhenInputIsEmpty(): void
@@ -564,10 +571,10 @@ class ConfigurationTest extends IntegrationTestCase
 
         $this->api->testConnection(
             'claude',
-            Common::sanitizeInputValue((string) json_encode([
+            (string) json_encode([
                 'apiKey' => 'secret-claude-key',
                 'endpointUrl' => '',
-            ]))
+            ])
         );
     }
 
@@ -680,10 +687,10 @@ class ConfigurationTest extends IntegrationTestCase
 
         $response = $this->api->testConnection(
             'openai',
-            Common::sanitizeInputValue((string) json_encode([
+            (string) json_encode([
                 'apiKey' => 'secret-openai-key',
                 'endpointUrl' => '',
-            ]))
+            ])
         );
 
         $this->assertSame('openai', $response['providerId']);
@@ -728,10 +735,10 @@ class ConfigurationTest extends IntegrationTestCase
 
         $response = $this->api->testConnection(
             'gemini',
-            Common::sanitizeInputValue((string) json_encode([
+            (string) json_encode([
                 'apiKey' => 'secret-gemini-key',
                 'endpointUrl' => '',
-            ]))
+            ])
         );
 
         $this->assertSame(2, $requests);

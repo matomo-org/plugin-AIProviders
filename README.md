@@ -44,6 +44,8 @@ openaiEndpointUrl = "..."  ; or env MATOMO_AIPROVIDERS_OPENAI_ENDPOINT_URL
 
 The config key is the provider ID verbatim plus the field suffix; the environment variable upper-cases the ID and replaces `-` with `_`. Credentials supplied this way never appear in the UI as secret values and cannot be edited or removed there.
 
+In a multi-tenant setup the `config.ini.php` is per tenant, so the `[AIProviders]` section is the natural place to give each tenant its own provider credentials and forced default. Environment variables are process-wide and shared across tenants, so prefer the config file when the value must differ per tenant.
+
 ### Restricted providers and the provider selection allowlist
 
 A managed environment can demote providers to *restricted* (non-selectable) in the `AIProviders.filterAIProviders` event via `AIProvidersList::setSelectable()`. Restricted providers are hidden from every admin surface and can never become the default, but stay registered for completions.

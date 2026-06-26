@@ -199,9 +199,9 @@ function selectProvider() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--theme-color-background-contrast, #fff);
+  background: var(--theme-color-background-contrast);
   border: 1px solid var(--ai-providers-border);
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   transition: border-color 120ms ease;
 
@@ -276,8 +276,10 @@ function selectProvider() {
 }
 
 .ai-providers-card.is-selected .ai-providers-card-inner {
-  background: var(--theme-color-background-contrast, #fff);
-  border-radius: 8px 8px 6px 6px;
+  background: var(--theme-color-background-contrast);
+  // Matches the card's 6px radius at the top; bottom corners are 1px tighter
+  // to sit cleanly inside the 1px accent frame (margin: 0 1px 1px).
+  border-radius: 6px 6px 5px 5px;
   margin: 0 1px 1px;
 }
 
@@ -285,7 +287,7 @@ function selectProvider() {
   min-height: 24px;
   padding: 5px 12px;
   background-color: var(--ai-providers-accent);
-  color: #fff;
+  color: var(--theme-color-brand-contrast);
   font-size: 10px;
   font-weight: 700;
   line-height: 1.5;

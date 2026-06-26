@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace Piwik\Plugins\AIProviders;
 
 use Exception;
-use Piwik\Common;
 use Piwik\Piwik;
 use Piwik\Plugin\API as PluginAPI;
 use Piwik\Plugins\AIProviders\Model\Configuration;
@@ -25,6 +24,11 @@ use Piwik\Plugins\AIProviders\Provider\AIProvider;
  */
 class API extends PluginAPI
 {
+    /**
+     * @var bool
+     */
+    protected $autoSanitizeInputParams = false;
+
     /**
      * @var Configuration
      */
@@ -176,7 +180,7 @@ class API extends PluginAPI
         #[\SensitiveParameter]
         string $providerConfigurationJson
     ): array {
-        $decoded = json_decode(Common::unsanitizeInputValue($providerConfigurationJson), true);
+        $decoded = json_decode($providerConfigurationJson, true);
 
         if (!is_array($decoded)) {
             throw new \InvalidArgumentException('Provider configuration must be a JSON object.');

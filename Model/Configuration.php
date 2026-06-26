@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace Piwik\Plugins\AIProviders\Model;
 
 use InvalidArgumentException;
-use Piwik\Common;
 use Piwik\Config;
 use Piwik\Settings\FieldConfig;
 use Piwik\Settings\Plugin\SystemSetting;
@@ -460,7 +459,7 @@ class Configuration
         #[\SensitiveParameter]
         string $providerConfigurationsJson
     ): array {
-        $decoded = json_decode(Common::unsanitizeInputValue($providerConfigurationsJson), true);
+        $decoded = json_decode($providerConfigurationsJson, true);
 
         if (!is_array($decoded)) {
             throw new InvalidArgumentException('Provider configurations must be a JSON object.');

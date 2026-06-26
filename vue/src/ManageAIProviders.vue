@@ -474,11 +474,11 @@ onMounted(loadSettings);
 <style lang="less">
 .ai-providers-page {
   position: relative;
-  --ai-providers-border: var(--theme-color-border-light, #e0e0e0);
-  --ai-providers-border-strong: var(--theme-color-border, #ccc);
-  --ai-providers-accent: var(--theme-color-brand, #43a047);
-  --ai-providers-text-muted: var(--theme-color-text-light, #666);
-  --ai-providers-heading: var(--theme-color-headline-alternative, #333);
+  --ai-providers-border: var(--theme-color-border-light);
+  --ai-providers-border-strong: var(--theme-color-border);
+  --ai-providers-accent: var(--theme-color-brand);
+  --ai-providers-text-muted: var(--theme-color-text-light);
+  --ai-providers-heading: var(--theme-color-headline-alternative);
 
   h2, h3, h4 {
     color: var(--ai-providers-heading);
@@ -518,7 +518,7 @@ onMounted(loadSettings);
 .ai-providers-section + .ai-providers-section {
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid #ccc;
+  border-top: 1px solid var(--ai-providers-border);
 }
 
 .ai-providers-section-help {
@@ -546,7 +546,7 @@ onMounted(loadSettings);
   display: flex;
   flex-direction: column;
   padding: 16px;
-  background: var(--theme-color-background-contrast, #fff);
+  background: var(--theme-color-background-contrast);
   border: 1px solid var(--ai-providers-border);
   border-radius: 6px;
   cursor: pointer;
@@ -559,7 +559,7 @@ onMounted(loadSettings);
   &.is-selected {
     border-color: var(--ai-providers-accent);
     box-shadow: 0 0 0 1px var(--ai-providers-accent) inset;
-    background: var(--theme-color-background-tinyContrast, #f7f7f7);
+    background: var(--theme-color-background-tinyContrast);
   }
 }
 
@@ -622,16 +622,16 @@ onMounted(loadSettings);
 
 .ai-providers-cancel {
   background: transparent;
-  color: var(--theme-color-text, #2f3033);
+  color: var(--theme-color-text);
   border: 1px solid var(--ai-providers-border-strong);
   box-shadow: none;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 
   &:hover,
   &:focus {
-    background: var(--theme-color-background-tinyContrast, #f2f2f2);
-    border-color: var(--theme-color-text-light, #666);
-    color: var(--theme-color-text, #2f3033);
+    background: var(--theme-color-background-tinyContrast);
+    border-color: var(--theme-color-text-light);
+    color: var(--theme-color-text);
   }
 
   &:disabled {
