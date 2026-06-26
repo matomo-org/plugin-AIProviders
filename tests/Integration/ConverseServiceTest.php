@@ -315,7 +315,7 @@ class ConverseServiceTest extends IntegrationTestCase
             $responseBody,
             &$capturedUrl,
             &$capturedBody
-): void {
+        ): void {
             $capturedUrl = $url;
             $capturedBody = json_decode((string) $httpEventParams['body'], true);
 

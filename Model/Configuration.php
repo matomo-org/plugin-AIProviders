@@ -155,6 +155,10 @@ class Configuration
     /**
      * Saves the default provider, capability level, and provider connection settings.
      *
+     * Both are optional so the form can be saved before any provider is
+     * connected: an empty default provider clears it (or falls back to the
+     * first usable one), and an empty capability level keeps the stored value.
+     *
      * In a managed environment the provider and its credentials
      * are forced from configuration, so nothing is persisted here.
      */
@@ -171,7 +175,7 @@ class Configuration
             $this->saveDefaultProviderId($providers, $defaultProviderId);
         }
 
-        if ($this->canEditCapabilityLevel()) {
+        if ($this->canEditCapabilityLevel() && trim($defaultCapabilityLevel) !== '') {
             $this->saveDefaultCapabilityLevel($defaultCapabilityLevel);
         }
     }

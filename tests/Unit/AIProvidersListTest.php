@@ -32,6 +32,16 @@ class AIProvidersListTest extends TestCase
         $this->assertCount(1, $providers->getSelectableProviders());
     }
 
+    public function testAddProviderReportsWhetherTheProviderWasAdded(): void
+    {
+        $providers = new AIProvidersList();
+
+        $this->assertTrue($providers->addProvider(new OpenAI()));
+        // A second registration for the same ID is ignored, reported as false.
+        $this->assertFalse($providers->addProvider(new OpenAI()));
+        $this->assertCount(1, $providers->getProviders());
+    }
+
     public function testProviderCanBeRegisteredAsRestricted(): void
     {
         $providers = new AIProvidersList();

@@ -11,13 +11,24 @@ declare(strict_types=1);
 
 namespace Piwik\Plugins\AIProviders;
 
-use Piwik\Container\StaticContainer;
 use Piwik\Menu\MenuAdmin;
 use Piwik\Piwik;
 use Piwik\Plugins\AIProviders\Model\Configuration;
 
 class Menu extends \Piwik\Plugin\Menu
 {
+    /**
+     * @var Configuration
+     */
+    private $configuration;
+
+    public function __construct(Configuration $configuration)
+    {
+        parent::__construct();
+
+        $this->configuration = $configuration;
+    }
+
     public function configureAdminMenu(MenuAdmin $menu): void
     {
         if (!Piwik::hasUserSuperUserAccess()) {
@@ -29,7 +40,7 @@ class Menu extends \Piwik\Plugin\Menu
          * forced from configuration and there is nothing to configure, so the
          * settings page is hidden entirely.
          */
-        if (StaticContainer::get(Configuration::class)->isManaged()) {
+        if ($this->configuration->isManaged()) {
             return;
         }
 

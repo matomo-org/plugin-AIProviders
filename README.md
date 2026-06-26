@@ -1,5 +1,8 @@
 # AIProviders
 
+[![Tests](https://github.com/matomo-org/plugin-AIProviders/actions/workflows/matomo-tests.yml/badge.svg)](https://github.com/matomo-org/plugin-AIProviders/actions/workflows/matomo-tests.yml)
+[![Vue build check](https://github.com/matomo-org/plugin-AIProviders/actions/workflows/buildvue.yml/badge.svg)](https://github.com/matomo-org/plugin-AIProviders/actions/workflows/buildvue.yml)
+
 Configure AI provider connections and default model settings used by Matomo AI features.
 
 Built-in providers: Claude, OpenAI, Gemini, and a generic custom provider for OpenAI-compatible endpoints.

@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace Piwik\Plugins\AIProviders;
 
 use Exception;
-use Piwik\Container\StaticContainer;
 use Piwik\Common;
 use Piwik\Piwik;
 use Piwik\Plugin\API as PluginAPI;
@@ -27,6 +26,22 @@ use Piwik\Plugins\AIProviders\Provider\AIProvider;
 class API extends PluginAPI
 {
     /**
+     * @var Configuration
+     */
+    private $configuration;
+
+    /**
+     * @var AIProviderService
+     */
+    private $aiProviderService;
+
+    public function __construct(Configuration $configuration, AIProviderService $aiProviderService)
+    {
+        $this->configuration = $configuration;
+        $this->aiProviderService = $aiProviderService;
+    }
+
+    /**
      * Returns AI provider settings for the administration UI.
      *
      * @return array<string, mixed> Provider metadata and masked configuration values.
@@ -38,7 +53,7 @@ class API extends PluginAPI
 
         $providers = AIProviders::getAvailableProviders();
 
-        return $this->getConfiguration()->getSettings($providers);
+        return $this->configuration->getSettings($providers);
     }
 
     /**
@@ -49,23 +64,31 @@ class API extends PluginAPI
      * forced from configuration, so the submitted default provider, credentials,
      * and capability level are all ignored.
      *
-     * @param string $defaultProviderId Provider ID to use by default.
+     * All parameters are optional so the form can be saved before any provider
+     * is connected: an empty default provider clears the stored default (or
+     * falls back to the first usable provider), and an empty capability level
+     * keeps the stored one. This lets a super user save credentials or the
+     * default capability level on their own without first connecting a provider.
+     *
+     * @param string $defaultProviderId Provider ID to use by default. Empty to
+     *                                  clear the default / let it fall back.
      * @param string $defaultCapabilityLevel Default model capability level.
+     *                                       Empty to keep the stored value.
      * @param string $providerConfigurations JSON object keyed by provider ID
      *                                      with connection settings.
      * @return array<string, mixed> Updated provider metadata and masked configuration values.
      * @throws Exception
      */
     public function saveSettings(
-        string $defaultProviderId,
-        string $defaultCapabilityLevel,
+        string $defaultProviderId = '',
+        string $defaultCapabilityLevel = '',
         #[\SensitiveParameter]
         string $providerConfigurations = '{}'
     ): array {
         Piwik::checkUserHasSuperUserAccess();
 
         $providers = AIProviders::getAvailableProviders();
-        $configuration = $this->getConfiguration();
+        $configuration = $this->configuration;
         $configuration->saveSettings(
             $providers,
             $defaultProviderId,
@@ -96,12 +119,12 @@ class API extends PluginAPI
 
         $providers = AIProviders::getAvailableProviders();
         $provider = $this->getSelectableProvider($providers, $providerId);
-        $configuration = $this->getConfiguration()->getProviderConfigurationForUse(
+        $configuration = $this->configuration->getProviderConfigurationForUse(
             $provider,
             $this->decodeProviderConfiguration($providerConfiguration)
         );
 
-        $this->getAIProviderService()->testProviderConnection($provider, $configuration);
+        $this->aiProviderService->testProviderConnection($provider, $configuration);
 
         return [
             'providerId' => $provider->getId(),
@@ -124,20 +147,9 @@ class API extends PluginAPI
         $providers = AIProviders::getAvailableProviders();
         $this->getSelectableProvider($providers, $providerId);
 
-        $configuration = $this->getConfiguration();
-        $configuration->removeProviderConfiguration($providerId);
+        $this->configuration->removeProviderConfiguration($providerId);
 
-        return $configuration->getSettings($providers);
-    }
-
-    private function getConfiguration(): Configuration
-    {
-        return StaticContainer::get(Configuration::class);
-    }
-
-    private function getAIProviderService(): AIProviderService
-    {
-        return StaticContainer::get(AIProviderService::class);
+        return $this->configuration->getSettings($providers);
     }
 
     /**

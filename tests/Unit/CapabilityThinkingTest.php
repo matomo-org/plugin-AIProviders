@@ -135,7 +135,7 @@ class RecordingCompleteOpenAI extends OpenAI
     /** @var array<string, mixed> */
     public $sentPayload = [];
 
-    protected function sendJsonRequest(string $url, array $headers, array $payload, int $timeoutSeconds = 240): array
+    protected function sendJsonRequest(string $url, array $headers, array $payload, int $timeoutSeconds = 30): array
     {
         $this->sentPayload = $payload;
 
@@ -148,7 +148,7 @@ class RecordingCompleteClaude extends Claude
     /** @var array<string, mixed> */
     public $sentPayload = [];
 
-    protected function sendJsonRequest(string $url, array $headers, array $payload, int $timeoutSeconds = 240): array
+    protected function sendJsonRequest(string $url, array $headers, array $payload, int $timeoutSeconds = 30): array
     {
         $this->sentPayload = $payload;
 
@@ -161,7 +161,7 @@ class RecordingCompleteGemini extends Gemini
     /** @var array<string, mixed> */
     public $sentPayload = [];
 
-    protected function sendJsonRequest(string $url, array $headers, array $payload, int $timeoutSeconds = 240): array
+    protected function sendJsonRequest(string $url, array $headers, array $payload, int $timeoutSeconds = 30): array
     {
         $this->sentPayload = $payload;
 
@@ -174,7 +174,7 @@ class RecordingCompleteCustomProvider extends CustomProvider
     /** @var array<string, mixed> */
     public $sentPayload = [];
 
-    protected function sendJsonRequest(string $url, array $headers, array $payload, int $timeoutSeconds = 240): array
+    protected function sendJsonRequest(string $url, array $headers, array $payload, int $timeoutSeconds = 30): array
     {
         $this->sentPayload = $payload;
 

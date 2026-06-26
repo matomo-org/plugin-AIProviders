@@ -874,7 +874,7 @@ abstract class AIProvider
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    protected function sendJsonRequest(string $url, array $headers, array $payload, int $timeoutSeconds = 240): array
+    protected function sendJsonRequest(string $url, array $headers, array $payload, int $timeoutSeconds = 30): array
     {
         $requestBody = json_encode($payload);
 

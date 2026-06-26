@@ -44,21 +44,24 @@ class AIProvidersList
      */
     private $selectable = [];
 
-    public function addProvider(AIProvider $provider, bool $selectable = true): void
+    /**
+     * Registers a provider, unless its ID is already taken.
+     *
+     * Provider IDs are unique and cannot be overwritten: the first registration
+     * for a given ID wins and later registrations are ignored. This protects the
+     * built-in providers (and a provider that is centrally forced in a managed
+     * multi-tenant environment) from being shadowed by another plugin. The
+     * selectable flag of the first registration is kept for the same reason.
+     *
+     * @return bool True when the provider was added, false when an entry for the
+     *              same ID already existed and this registration was ignored
+     *              (also logged as a warning so the collision is visible).
+     */
+    public function addProvider(AIProvider $provider, bool $selectable = true): bool
     {
         $providerId = $provider->getId();
 
         if (isset($this->providers[$providerId])) {
-            /**
-             * Provider IDs are unique and cannot be overwritten: the first
-             * registration for a given ID wins and later registrations are
-             * ignored. This protects the built-in providers (and a provider that
-             * is centrally forced in a managed multi-tenant environment) from
-             * being shadowed by another plugin.
-             * The selectable flag of the first registration is kept for the
-             * same reason. The ignored registration is logged so the collision
-             * is visible.
-             */
             StaticContainer::get(LoggerInterface::class)->warning(
                 'AI provider "{id}" is already registered as {existing}; ignoring duplicate registration of {ignored}.',
                 [
@@ -68,11 +71,13 @@ class AIProvidersList
                 ]
             );
 
-            return;
+            return false;
         }
 
         $this->providers[$providerId] = $provider;
         $this->selectable[$providerId] = $selectable;
+
+        return true;
     }
 
     public function removeProvider(string $providerId): void

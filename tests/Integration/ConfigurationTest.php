@@ -77,6 +77,27 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertTrue($customProvider['supportsCustomEndpoint']);
     }
 
+    public function testSaveSettingsCanBeCalledWithDefaultsBeforeAnyProviderIsConnected(): void
+    {
+        // Saving the form with nothing configured must not throw: an empty
+        // default provider and capability level are valid (see saveSettings()).
+        $settings = $this->api->saveSettings();
+
+        $this->assertSame('', $settings['defaultProviderId']);
+        $this->assertSame(Configuration::CAPABILITY_INSTANT, $settings['defaultCapabilityLevel']);
+    }
+
+    public function testSaveSettingsWithEmptyCapabilityLevelKeepsStoredValue(): void
+    {
+        $this->api->saveSettings('', Configuration::CAPABILITY_THINKING, '{}');
+
+        // An empty capability level leaves the stored value untouched rather
+        // than resetting it, so the capability can be saved independently.
+        $settings = $this->api->saveSettings('', '', '{}');
+
+        $this->assertSame(Configuration::CAPABILITY_THINKING, $settings['defaultCapabilityLevel']);
+    }
+
     public function testSaveSettingsStoresApiKeyWithoutReturningIt(): void
     {
         $settings = $this->api->saveSettings(
@@ -624,7 +645,7 @@ class ConfigurationTest extends IntegrationTestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('managed');
 
-        (new Controller())->index();
+        StaticContainer::get(Controller::class)->index();
     }
 
     public function testProvidersCannotBeOverwritten(): void
@@ -632,8 +653,9 @@ class ConfigurationTest extends IntegrationTestCase
         $providers = new AIProvidersList();
         $first = new OpenAI();
 
-        $providers->addProvider($first);
-        $providers->addProvider(new OpenAI());
+        $this->assertTrue($providers->addProvider($first));
+        // A duplicate ID is rejected and reported via the return value.
+        $this->assertFalse($providers->addProvider(new OpenAI()));
 
         $this->assertCount(1, $providers->getProviders());
         $this->assertSame($first, $providers->getProvider('openai'));

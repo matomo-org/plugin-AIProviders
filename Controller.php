@@ -11,13 +11,28 @@ declare(strict_types=1);
 
 namespace Piwik\Plugins\AIProviders;
 
-use Piwik\Container\StaticContainer;
+use Exception;
 use Piwik\Piwik;
 use Piwik\Plugin\ControllerAdmin;
 use Piwik\Plugins\AIProviders\Model\Configuration;
 
 class Controller extends ControllerAdmin
 {
+    /**
+     * @var Configuration
+     */
+    private $configuration;
+
+    public function __construct(Configuration $configuration)
+    {
+        parent::__construct();
+
+        $this->configuration = $configuration;
+    }
+
+    /**
+     * @throws Exception
+     */
     public function index(): string
     {
         Piwik::checkUserHasSuperUserAccess();
@@ -28,8 +43,8 @@ class Controller extends ControllerAdmin
          * settings page is intentionally unavailable (the menu entry is hidden
          * too). This guards against direct URL access.
          */
-        if (StaticContainer::get(Configuration::class)->isManaged()) {
-            throw new \Exception('AI provider settings are managed and cannot be changed on this instance.');
+        if ($this->configuration->isManaged()) {
+            throw new Exception('AI provider settings are managed and cannot be changed on this instance.');
         }
 
         return $this->renderTemplate('index');
