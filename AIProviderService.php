@@ -314,6 +314,16 @@ class AIProviderService
     }
 
     /**
+     * Returns whether the plugin runs in a managed environment, that is, the
+     * default provider is forced (and locked) from configuration so settings
+     * cannot be changed from the administration UI.
+     */
+    public function isManaged(): bool
+    {
+        return $this->configuration->isManaged();
+    }
+
+    /**
      * Returns provider status metadata for trusted PHP callers.
      *
      * Restricted providers (registered as non-selectable by a managed
