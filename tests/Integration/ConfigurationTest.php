@@ -408,6 +408,28 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertSame('claude-sonnet-4-5', $capturedBody['model']);
     }
 
+    public function testNonSuperUserServiceCallDoesNotForceDefaultProviderOnUnmanagedInstance(): void
+    {
+        $this->saveOpenAiAndClaudeKeys();
+        $this->setAnonymousUser();
+
+        $capturedUrl = null;
+        $capturedBody = null;
+        $this->mockClaudeResponse('Brand X is a well-known brand.', $capturedUrl, $capturedBody);
+
+        $response = StaticContainer::get(AIProviderService::class)->complete(
+            (new AIRequest('What do you know about brand X?', 'ExamplePlugin'))
+                ->withProviderId('anthropic')
+                ->withModel('claude-sonnet-4-5')
+        );
+
+        $this->assertFalse(StaticContainer::get(AIProviderService::class)->isManaged());
+        $this->assertSame('anthropic', $response->toArray()['providerId']);
+        $this->assertSame('https://api.anthropic.com/v1/messages', $capturedUrl);
+        $this->assertIsArray($capturedBody);
+        $this->assertSame('claude-sonnet-4-5', $capturedBody['model']);
+    }
+
     public function testAllowlistOnlyAppliesToTheNamedCallerPlugin(): void
     {
         $this->saveOpenAiAndClaudeKeys();
@@ -710,7 +732,10 @@ class ConfigurationTest extends IntegrationTestCase
             ?string &$response,
             ?int &$status,
             array &$headers
-        ) use (&$requests, $transientStatus): void {
+        ) use (
+            &$requests,
+            $transientStatus
+): void {
             $this->assertSame(
                 'https://generativelanguage.googleapis.com/v1beta/models',
                 $url
@@ -778,7 +803,10 @@ class ConfigurationTest extends IntegrationTestCase
             ?string &$response,
             ?int &$status,
             array &$headers
-        ) use (&$requests, $permanentStatus): void {
+        ) use (
+            &$requests,
+            $permanentStatus
+): void {
             $requests++;
 
             $response = (string) json_encode([

@@ -89,7 +89,7 @@ class Anthropic extends AIProvider
             $payload
         );
 
-        $text = $response['content'][0]['text'] ?? '';
+        $text = $this->getFirstTextBlock($response['content'] ?? []);
         $stopReason = is_string($response['stop_reason'] ?? null) ? $response['stop_reason'] : null;
 
         return $this->buildResponse(
@@ -100,6 +100,32 @@ class Anthropic extends AIProvider
             isset($response['usage']['output_tokens']) ? (int) $response['usage']['output_tokens'] : null,
             $stopReason
         );
+    }
+
+    /**
+     * With thinking enabled, anthropic returns the text block at a different index.
+     *
+     * @param mixed $content
+     */
+    private function getFirstTextBlock($content): string
+    {
+        if (!is_array($content)) {
+            return '';
+        }
+
+        foreach ($content as $block) {
+            if (!is_array($block)) {
+                continue;
+            }
+
+            if (($block['type'] ?? null) === 'text' && is_string($block['text'] ?? null)) {
+                return $block['text'];
+            }
+        }
+
+        $fallback = $content[0]['text'] ?? '';
+
+        return is_string($fallback) ? $fallback : '';
     }
 
     /**

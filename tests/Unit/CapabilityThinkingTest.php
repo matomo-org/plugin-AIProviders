@@ -76,6 +76,31 @@ class CapabilityThinkingTest extends TestCase
         $this->assertArrayNotHasKey('temperature', $claude->sentPayload);
     }
 
+    public function testClaudeThinkingReadsTextBlockAfterThinkingBlock(): void
+    {
+        $claude = new RecordingCompleteAnthropic();
+        $claude->mockResponse = [
+            'content' => [
+                ['type' => 'thinking', 'thinking' => 'internal reasoning', 'signature' => 'sig'],
+                ['type' => 'text', 'text' => 'visible answer'],
+            ],
+            'stop_reason' => 'end_turn',
+        ];
+
+        $response = $claude->complete($this->thinkingRequest(), self::CLAUDE_CONFIG);
+
+        $this->assertSame('visible answer', $response->getText());
+    }
+
+    public function testClaudeCompletionStillAcceptsLegacyTextBlockShape(): void
+    {
+        $claude = new RecordingCompleteAnthropic();
+
+        $response = $claude->complete($this->instantRequest(), self::CLAUDE_CONFIG);
+
+        $this->assertSame('ok', $response->getText());
+    }
+
     public function testGeminiInstantDisablesThinkingBudget(): void
     {
         $gemini = new RecordingCompleteGoogle();
@@ -148,11 +173,14 @@ class RecordingCompleteAnthropic extends Anthropic
     /** @var array<string, mixed> */
     public $sentPayload = [];
 
+    /** @var array<string, mixed> */
+    public $mockResponse = ['content' => [['text' => 'ok']], 'stop_reason' => 'end_turn'];
+
     protected function sendJsonRequest(string $url, array $headers, array $payload, int $timeoutSeconds = 30): array
     {
         $this->sentPayload = $payload;
 
-        return ['content' => [['text' => 'ok']], 'stop_reason' => 'end_turn'];
+        return $this->mockResponse;
     }
 }
 

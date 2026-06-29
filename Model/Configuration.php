@@ -294,12 +294,12 @@ class Configuration
      */
     public function canEditProviderConfiguration(): bool
     {
-        return !$this->isManaged();
+        return !$this->isManaged() && $this->defaultProvider->isWritableByCurrentUser();
     }
 
     public function canEditCapabilityLevel(): bool
     {
-        return !$this->isManaged();
+        return !$this->isManaged() && $this->defaultCapabilityLevel->isWritableByCurrentUser();
     }
 
     /**
@@ -416,7 +416,10 @@ class Configuration
      */
     public function isManaged(): bool
     {
-        return !$this->defaultProvider->isWritableByCurrentUser();
+        $config = Config::getInstance()->AIProviders;
+        $providerId = is_array($config) ? ($config[self::SETTING_DEFAULT_PROVIDER] ?? null) : null;
+
+        return is_string($providerId) && trim($providerId) !== '';
     }
 
     /**
