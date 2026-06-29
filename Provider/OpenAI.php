@@ -22,7 +22,7 @@ class OpenAI extends AIProvider
 
     public function __construct()
     {
-        parent::__construct('openai', 'OpenAI', 'AIProviders_OpenAIDescription');
+        parent::__construct('openai', 'OpenAI', 'AIProviders_OpenAIDefaultModelDescription');
     }
 
     public function getDefaultEndpointUrl(): string

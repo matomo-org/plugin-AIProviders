@@ -28,7 +28,13 @@ class Gemini extends AIProvider
 
     public function __construct()
     {
-        parent::__construct('gemini', 'Gemini', 'AIProviders_GeminiDescription');
+        parent::__construct(
+            'gemini',
+            'Gemini',
+            'AIProviders_GoogleDefaultModelDescription',
+            false,
+            'Google'
+        );
     }
 
     public function getDefaultEndpointUrl(): string

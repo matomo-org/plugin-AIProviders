@@ -473,7 +473,6 @@ onMounted(loadSettings);
 
 <style lang="less">
 .ai-providers-page {
-  position: relative;
   --ai-providers-border: var(--theme-color-border-light);
   --ai-providers-border-strong: var(--theme-color-border);
   --ai-providers-accent: var(--theme-color-brand);
@@ -529,13 +528,16 @@ onMounted(loadSettings);
 .ai-providers-cards,
 .ai-providers-capability-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 16px;
 }
 
 .ai-providers-cards {
-  padding-top: 24px;
-  margin-top: 32px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  margin-top: 16px;
+}
+
+.ai-providers-capability-cards {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .ai-providers-default-warning {

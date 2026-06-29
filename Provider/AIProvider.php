@@ -60,6 +60,11 @@ abstract class AIProvider
     private $description;
 
     /**
+     * @var string
+     */
+    private $displayName;
+
+    /**
      * @var bool
      */
     private $supportsCustomEndpoint;
@@ -73,11 +78,13 @@ abstract class AIProvider
         string $id,
         string $name,
         string $description,
-        bool $supportsCustomEndpoint = false
+        bool $supportsCustomEndpoint = false,
+        string $displayName = ''
     ) {
         $this->id = $id;
         $this->name = $name;
         $this->description = $description;
+        $this->displayName = $displayName;
         $this->supportsCustomEndpoint = $supportsCustomEndpoint;
     }
 
@@ -89,6 +96,11 @@ abstract class AIProvider
     public function getName(): string
     {
         return $this->name;
+    }
+
+    public function getDisplayName(): string
+    {
+        return $this->displayName ?: $this->getName();
     }
 
     public function getDescription(): string
@@ -772,6 +784,7 @@ abstract class AIProvider
      * @return array{
      *     id: string,
      *     name: string,
+     *     displayName: string,
      *     description: string,
      *     supportsCustomEndpoint: bool,
      *     defaultModel: string
@@ -782,6 +795,7 @@ abstract class AIProvider
         return [
             'id' => $this->getId(),
             'name' => $this->getName(),
+            'displayName' => $this->getDisplayName(),
             'description' => $this->getDescription(),
             'supportsCustomEndpoint' => $this->supportsCustomEndpoint(),
             'defaultModel' => $this->getDefaultModel(),

@@ -34,7 +34,13 @@ class Claude extends AIProvider
 
     public function __construct()
     {
-        parent::__construct('claude', 'Claude', 'AIProviders_ClaudeDescription');
+        parent::__construct(
+            'claude',
+            'Claude',
+            'AIProviders_AnthropicDefaultModelDescription',
+            false,
+            'Anthropic'
+        );
     }
 
     public function getDefaultEndpointUrl(): string

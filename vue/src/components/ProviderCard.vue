@@ -67,21 +67,22 @@ function selectProvider() {
     @keydown.enter.prevent="selectProvider()"
     @keydown.space.prevent="selectProvider()"
   >
-    <div
-      v-if="selected"
-      class="ai-providers-card-default"
-    >
-      {{ translate('AIProviders_DefaultBadge') }}
-    </div>
-
     <div class="ai-providers-card-inner">
-      <div class="ai-providers-card-header">
-        <span class="ai-providers-card-name">{{ provider.name }}</span>
-      </div>
+      <div class="ai-providers-card-heading">
+        <div class="ai-providers-card-header">
+          <span class="ai-providers-card-name">{{ provider.displayName }}</span>
+          <span
+            v-if="selected"
+            class="ai-providers-card-default"
+          >
+            {{ translate('AIProviders_DefaultBadge') }}
+          </span>
+        </div>
 
-      <p class="ai-providers-card-description">
-        {{ translate(provider.description) }}
-      </p>
+        <p class="ai-providers-card-description">
+          {{ translate(provider.description) }}
+        </p>
+      </div>
 
       <template v-if="canEdit">
         <Field
@@ -195,10 +196,8 @@ function selectProvider() {
 
 <style lang="less">
 .ai-providers-card {
-  position: relative;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   background: var(--theme-color-background-contrast);
   border: 1px solid var(--ai-providers-border);
   border-radius: 6px;
@@ -210,9 +209,9 @@ function selectProvider() {
   }
 
   &.is-selected {
-    background: var(--ai-providers-accent);
     border-color: var(--ai-providers-accent);
-    margin-top: -24px;
+    box-shadow: 0 0 0 1px var(--ai-providers-accent) inset;
+    background: var(--theme-color-background-tinyContrast);
   }
 
   &.is-not-usable {
@@ -223,31 +222,24 @@ function selectProvider() {
   &:focus-visible,
   &:active {
     outline: none;
-    box-shadow: none;
   }
 
-  // Reset Materialize wrapper margins that would otherwise double-stack with
-  // our own form-group / card-description spacing.
-  .form-group {
-    margin-bottom: 12px;
-    border: 0;
-  }
-
-  .input-field {
-    margin-top: 0;
-    margin-bottom: 0;
-  }
-
+  // Strip every outer margin Materialize puts on the form field so the card's
+  // own layout (the `gap` on .ai-providers-card-inner) is the single source of
+  // vertical spacing. Without this the row/form-group/input margins stack
+  // unpredictably and collide with the status line.
   .matomo-form-field {
     border: 0;
-    margin-left: 0;
-    margin-right: 0;
-    margin-top: 32px;
+    margin: 0;
 
     > .col {
       padding-left: 0 !important;
       padding-right: 0 !important;
     }
+  }
+
+  .input-field {
+    margin: 0;
   }
 
   .input-field > label,
@@ -263,6 +255,7 @@ function selectProvider() {
   .input-field > input {
     padding-left: 0;
     margin-left: 0;
+    margin-bottom: 0;
     width: 100%;
     box-sizing: border-box;
   }
@@ -272,36 +265,38 @@ function selectProvider() {
   display: flex;
   flex-direction: column;
   flex: 1;
+  gap: 16px;
   padding: 16px;
 }
 
-.ai-providers-card.is-selected .ai-providers-card-inner {
-  background: var(--theme-color-background-contrast);
-  // Matches the card's 6px radius at the top; bottom corners are 1px tighter
-  // to sit cleanly inside the 1px accent frame (margin: 0 1px 1px).
-  border-radius: 6px 6px 5px 5px;
-  margin: 0 1px 1px;
-}
-
 .ai-providers-card-default {
-  min-height: 24px;
-  padding: 5px 12px;
+  flex: none;
+  padding: 3px 8px;
   background-color: var(--ai-providers-accent);
   color: var(--theme-color-brand-contrast);
+  border-radius: 4px;
   font-size: 10px;
   font-weight: 700;
   line-height: 1.5;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .ai-providers-card-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 8px 12px;
+  // Reserve the badge's height so promoting a card to default doesn't push
+  // the rest of the card content down.
+  min-height: 24px;
   margin-bottom: 8px;
 }
 
 .ai-providers-card-name {
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--ai-providers-heading);
   font-weight: 600;
   font-size: 15px;
@@ -311,7 +306,7 @@ function selectProvider() {
   color: var(--ai-providers-text-muted);
   font-size: 13px;
   line-height: 1.5;
-  margin: 0 0 16px;
+  margin: 0;
 }
 
 .ai-providers-refresh-models {
@@ -344,7 +339,7 @@ function selectProvider() {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 4px 0 0;
+  margin: 0;
   color: var(--ai-providers-text-muted);
   font-size: 13px;
   line-height: 1.5;

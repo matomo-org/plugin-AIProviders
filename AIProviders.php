@@ -87,11 +87,10 @@ class AIProviders extends Plugin
 
     public function getClientSideTranslationKeys(array &$translations): void
     {
+        $translations[] = 'AIProviders_AnthropicDefaultModelDescription';
         $translations[] = 'AIProviders_ApiKey';
         $translations[] = 'AIProviders_ApiKeyAlreadyConfiguredPlaceholder';
         $translations[] = 'AIProviders_ApiKeyPlaceholder';
-        $translations[] = 'AIProviders_BedrockDescription';
-        $translations[] = 'AIProviders_ClaudeDescription';
         $translations[] = 'AIProviders_ClickTestConnectionToShowAvailableModels';
         $translations[] = 'AIProviders_ConfigurationIntro';
         $translations[] = 'AIProviders_CustomProviderDescription';
@@ -106,14 +105,14 @@ class AIProviders extends Plugin
         $translations[] = 'AIProviders_Disconnecting';
         $translations[] = 'AIProviders_EndpointUrl';
         $translations[] = 'AIProviders_EndpointUrlPlaceholder';
-        $translations[] = 'AIProviders_GeminiDescription';
+        $translations[] = 'AIProviders_GoogleDefaultModelDescription';
         $translations[] = 'AIProviders_InstantCapability';
         $translations[] = 'AIProviders_InstantCapabilityDescription';
         $translations[] = 'AIProviders_ManagedConfigurationHelp';
         $translations[] = 'AIProviders_MenuTitle';
         $translations[] = 'AIProviders_Model';
         $translations[] = 'AIProviders_NoDefaultProviderWarning';
-        $translations[] = 'AIProviders_OpenAIDescription';
+        $translations[] = 'AIProviders_OpenAIDefaultModelDescription';
         $translations[] = 'AIProviders_RefreshModels';
         $translations[] = 'AIProviders_RequestFailed';
         $translations[] = 'AIProviders_SettingsSaveSuccess';
