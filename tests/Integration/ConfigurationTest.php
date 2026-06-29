@@ -19,6 +19,7 @@ use Piwik\Plugins\AIProviders\AIRequest;
 use Piwik\Plugins\AIProviders\API;
 use Piwik\Plugins\AIProviders\AIProviderService;
 use Piwik\Plugins\AIProviders\Controller;
+use Piwik\Plugins\AIProviders\Exception\AIProviderClientException;
 use Piwik\Plugins\AIProviders\Model\Configuration;
 use Piwik\Plugins\AIProviders\Provider\OpenAI;
 use Piwik\Tests\Framework\Fixture;
@@ -697,7 +698,10 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertSame('OpenAI', $response['providerName']);
     }
 
-    public function testApiRetriesTransientProviderErrors(): void
+    /**
+     * @dataProvider getTransientErrorStatusCodes
+     */
+    public function testApiRetriesTransientProviderErrors(int $transientStatus): void
     {
         $requests = 0;
         Piwik::addAction('Http.sendHttpRequest', function (
@@ -706,7 +710,7 @@ class ConfigurationTest extends IntegrationTestCase
             ?string &$response,
             ?int &$status,
             array &$headers
-        ) use (&$requests): void {
+        ) use (&$requests, $transientStatus): void {
             $this->assertSame(
                 'https://generativelanguage.googleapis.com/v1beta/models',
                 $url
@@ -718,12 +722,12 @@ class ConfigurationTest extends IntegrationTestCase
             if ($requests === 1) {
                 $response = (string) json_encode([
                     'error' => [
-                        'code' => 503,
+                        'code' => $transientStatus,
                         'message' => 'This model is currently experiencing high demand.',
                         'status' => 'UNAVAILABLE',
                     ],
                 ]);
-                $status = 503;
+                $status = $transientStatus;
                 $headers = ['Content-Type' => 'application/json'];
                 return;
             }
@@ -744,6 +748,77 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertSame(2, $requests);
         $this->assertSame('google', $response['providerId']);
         $this->assertSame('Google', $response['providerName']);
+    }
+
+    /**
+     * @return array<array{int}>
+     */
+    public function getTransientErrorStatusCodes(): array
+    {
+        return [
+            'request timeout (408)' => [408],
+            'rate limited (429)' => [429],
+            'internal server error (500)' => [500],
+            'bad gateway (502)' => [502],
+            'service unavailable (503)' => [503],
+            'gateway timeout (504)' => [504],
+            'overloaded (529)' => [529],
+        ];
+    }
+
+    /**
+     * @dataProvider getNonRetryableErrorStatusCodes
+     */
+    public function testApiDoesNotRetryPermanentProviderErrors(int $permanentStatus): void
+    {
+        $requests = 0;
+        Piwik::addAction('Http.sendHttpRequest', function (
+            string $url,
+            array $httpEventParams,
+            ?string &$response,
+            ?int &$status,
+            array &$headers
+        ) use (&$requests, $permanentStatus): void {
+            $requests++;
+
+            $response = (string) json_encode([
+                'error' => [
+                    'code' => $permanentStatus,
+                    'message' => 'The request body is malformed.',
+                    'status' => 'INVALID_ARGUMENT',
+                ],
+            ]);
+            $status = $permanentStatus;
+            $headers = ['Content-Type' => 'application/json'];
+        });
+
+        try {
+            $this->api->testConnection(
+                'google',
+                (string) json_encode([
+                    'apiKey' => 'secret-gemini-key',
+                    'endpointUrl' => '',
+                ])
+            );
+            $this->fail('Expected a permanent provider error to be thrown.');
+        } catch (AIProviderClientException $e) {
+            // expected: permanent client errors are surfaced, not retried
+        }
+
+        $this->assertSame(1, $requests);
+    }
+
+    /**
+     * @return array<array{int}>
+     */
+    public function getNonRetryableErrorStatusCodes(): array
+    {
+        return [
+            'bad request (400)' => [400],
+            'forbidden (403)' => [403],
+            'not found (404)' => [404],
+            'request too large (413)' => [413],
+        ];
     }
 
     public function testDisconnectProviderRemovesStoredApiKey(): void

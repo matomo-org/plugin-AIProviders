@@ -35,6 +35,14 @@ abstract class AIProvider
 {
     private const TRANSIENT_ERROR_RETRY_DELAYS = [1, 2];
 
+    /**
+     * HTTP status codes that indicate a transient provider failure worth
+     * retrying. Keep 408/502 for AWS Bedrock and 529 for Anthropic overloads.
+     * Other 4xx responses (e.g. 400/401/403/404/413) are permanent and are
+     * not retried.
+     */
+    private const TRANSIENT_ERROR_STATUS_CODES = [408, 429, 500, 502, 503, 504, 529];
+
     private const JSON_RESPONSE_INSTRUCTION = 'Respond with a single valid JSON object and nothing else. Do not wrap it in Markdown code fences.';
 
     /**
@@ -864,7 +872,7 @@ abstract class AIProvider
     /**
      * Sends a JSON request to the provider and returns the decoded JSON object.
      *
-     * Transient errors (HTTP 500/503) are retried with backoff. Failures are
+     * Transient errors (HTTP 429/500/503/504/529) are retried with backoff. Failures are
      * classified: {@link AIProviderClientException} for authentication and
      * 4xx responses, {@link AIProviderServerException} for 5xx responses
      * after retries, {@link AIProviderException} for transport and protocol
@@ -1215,7 +1223,7 @@ abstract class AIProvider
      */
     private function shouldRetryTransientError(int $status, int $attempt, array $retryDelays): bool
     {
-        return in_array($status, [500, 503], true)
+        return in_array($status, self::TRANSIENT_ERROR_STATUS_CODES, true)
             && array_key_exists($attempt, $retryDelays);
     }
 }
