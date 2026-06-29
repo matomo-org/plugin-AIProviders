@@ -22,18 +22,17 @@ use Piwik\Plugins\AIProviders\CanonicalMessage;
  * @phpstan-import-type CanonicalContentBlockArray from CanonicalMessage
  * @phpstan-import-type ToolCatalogEntryArray from AIConversationRequest
  */
-class Gemini extends AIProvider
+class Google extends AIProvider
 {
     private const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
 
     public function __construct()
     {
         parent::__construct(
-            'gemini',
-            'Gemini',
+            'google',
+            'Google',
             'AIProviders_GoogleDefaultModelDescription',
-            false,
-            'Google'
+            false
         );
     }
 
@@ -48,7 +47,7 @@ class Gemini extends AIProvider
     }
 
     /**
-     * Custom Gemini chat completion method.
+     * Custom Google chat completion method.
      * @see https://ai.google.dev/gemini-api/docs/text-generation
      * @param array<string, string> $configuration
      */
@@ -130,12 +129,12 @@ class Gemini extends AIProvider
     }
 
     /**
-     * Runs one conversational round-trip against the Gemini generateContent API.
+     * Runs one conversational round-trip against the Google generateContent API.
      *
-     * Gemini diverges from the canonical shape in two ways that this method
+     * Google diverges from the canonical shape in two ways that this method
      * reconciles. First, its roles are 'user' and 'model' (not 'assistant'),
      * and canonical 'tool' result messages fold into 'user' messages carrying
-     * functionResponse parts. Second, and trickier, Gemini has no tool-call
+     * functionResponse parts. Second, and trickier, Google has no tool-call
      * IDs: a functionResponse correlates with its functionCall purely by
      * function NAME (and order). The canonical tool_result only carries the
      * originating tool_use_id, so this method first walks the history building
@@ -152,7 +151,7 @@ class Gemini extends AIProvider
         $model = $this->resolveConversationModel($request);
 
         $payload = [
-            'contents' => $this->canonicalMessagesToGemini($request->getMessages()),
+            'contents' => $this->canonicalMessagesToGoogle($request->getMessages()),
             'generationConfig' => [
                 'maxOutputTokens' => $request->getMaxTokens(),
                 'temperature' => $request->getTemperature(),
@@ -170,7 +169,7 @@ class Gemini extends AIProvider
             ];
         }
 
-        $tools = $this->toolCatalogToGemini($request->getTools());
+        $tools = $this->toolCatalogToGoogle($request->getTools());
         if ($tools !== null) {
             $payload['tools'] = $tools;
         }
@@ -191,7 +190,7 @@ class Gemini extends AIProvider
             ? $response['candidates'][0]['finishReason']
             : '';
 
-        $content = $this->geminiPartsToCanonical($parts);
+        $content = $this->googlePartsToCanonical($parts);
         $stopReason = $this->resolveStopReason($content, $finishReason);
 
         return $this->buildConversationResponse(
@@ -207,9 +206,9 @@ class Gemini extends AIProvider
      * @param list<CanonicalMessageArray> $messages canonical messages
      * @return list<array{role: string, parts: list<array<string, mixed>>}>
      */
-    private function canonicalMessagesToGemini(array $messages): array
+    private function canonicalMessagesToGoogle(array $messages): array
     {
-        // Gemini correlates tool results to tool calls by function name, not
+        // Google correlates tool results to tool calls by function name, not
         // id, so build an id => name map from all tool_use blocks first.
         $toolUseNamesById = $this->buildToolUseNameLookup($messages);
 
@@ -218,13 +217,13 @@ class Gemini extends AIProvider
             $role = $message['role'];
 
             if ($role === 'assistant') {
-                $parts = $this->assistantBlocksToGeminiParts($message['content']);
+                $parts = $this->assistantBlocksToGoogleParts($message['content']);
                 $contents[] = ['role' => 'model', 'parts' => $parts];
                 continue;
             }
 
             if ($role === 'tool') {
-                $parts = $this->toolResultBlocksToGeminiParts($message['content'], $toolUseNamesById);
+                $parts = $this->toolResultBlocksToGoogleParts($message['content'], $toolUseNamesById);
                 $contents[] = ['role' => 'user', 'parts' => $parts];
                 continue;
             }
@@ -265,7 +264,7 @@ class Gemini extends AIProvider
      * @param list<CanonicalContentBlockArray> $blocks canonical assistant content blocks
      * @return list<array<string, mixed>>
      */
-    private function assistantBlocksToGeminiParts(array $blocks): array
+    private function assistantBlocksToGoogleParts(array $blocks): array
     {
         $parts = [];
         foreach ($blocks as $block) {
@@ -298,14 +297,14 @@ class Gemini extends AIProvider
     }
 
     /**
-     * Translates canonical tool_result blocks into Gemini functionResponse
+     * Translates canonical tool_result blocks into Google functionResponse
      * parts, resolving each result's function name from the id => name lookup.
      *
      * @param list<CanonicalContentBlockArray> $blocks canonical tool_result blocks
      * @param array<string, string> $toolUseNamesById
      * @return list<array<string, mixed>>
      */
-    private function toolResultBlocksToGeminiParts(array $blocks, array $toolUseNamesById): array
+    private function toolResultBlocksToGoogleParts(array $blocks, array $toolUseNamesById): array
     {
         $parts = [];
         foreach ($blocks as $block) {
@@ -314,7 +313,7 @@ class Gemini extends AIProvider
             }
 
             $toolUseId = $block['tool_use_id'] ?? null;
-            // Gemini correlates by name; recover it from the prior tool_use
+            // Google correlates by name; recover it from the prior tool_use
             // block, falling back to a stable placeholder when unknown.
             $name = is_string($toolUseId) && isset($toolUseNamesById[$toolUseId])
                 ? $toolUseNamesById[$toolUseId]
@@ -335,7 +334,7 @@ class Gemini extends AIProvider
     }
 
     /**
-     * Gemini expects functionResponse.response to be a JSON object. Structured
+     * Google expects functionResponse.response to be a JSON object. Structured
      * output is used verbatim when present; otherwise the MCP content blocks
      * are folded into a single {content: ...} object, with non-text blocks
      * JSON-stringified so their data still reaches the model. An error flag is
@@ -378,7 +377,7 @@ class Gemini extends AIProvider
      * @param list<ToolCatalogEntryArray> $tools
      * @return list<array{functionDeclarations: list<array{name: string, description: string, parameters: array<string, mixed>}>}>|null
      */
-    private function toolCatalogToGemini(array $tools): ?array
+    private function toolCatalogToGoogle(array $tools): ?array
     {
         if ($tools === []) {
             return null;
@@ -389,7 +388,7 @@ class Gemini extends AIProvider
             $declarations[] = [
                 'name' => $tool['name'],
                 'description' => $tool['description'],
-                'parameters' => $this->geminiParameterSchema($tool['inputSchema']),
+                'parameters' => $this->googleParameterSchema($tool['inputSchema']),
             ];
         }
 
@@ -397,12 +396,12 @@ class Gemini extends AIProvider
     }
 
     /**
-     * Gemini's function-declaration parameters accept only a restricted subset
+     * Google's function-declaration parameters accept only a restricted subset
      * of the OpenAPI 3.0 schema and reject standard JSON Schema keywords such as
      * `additionalProperties` or `$schema` — and not just at the top level: it
      * rejects them at every nesting depth (e.g. inside `properties[...]`). The
      * shared {@see toToolParametersObjectSchema} only normalises the top level,
-     * which is all OpenAI needs, so Gemini layers a recursive strip on top.
+     * which is all OpenAI needs, so Google layers a recursive strip on top.
      *
      * The removed keywords are validation hints only; the tool server
      * re-validates arguments when the tool actually runs, so dropping them keeps
@@ -411,22 +410,22 @@ class Gemini extends AIProvider
      * @param array<string, mixed> $schema
      * @return array<string, mixed>
      */
-    private function geminiParameterSchema(array $schema): array
+    private function googleParameterSchema(array $schema): array
     {
-        return $this->stripGeminiUnsupportedKeywords(
+        return $this->stripGoogleUnsupportedKeywords(
             $this->toToolParametersObjectSchema($schema)
         );
     }
 
     /**
-     * Recursively removes JSON Schema keywords Gemini rejects anywhere in the
+     * Recursively removes JSON Schema keywords Google rejects anywhere in the
      * tree, walking into `properties`, `items`, and `anyOf`/`oneOf`/`allOf`
      * branches so nested object/array schemas are cleaned too.
      *
      * @param array<string, mixed> $schema
      * @return array<string, mixed>
      */
-    private function stripGeminiUnsupportedKeywords(array $schema): array
+    private function stripGoogleUnsupportedKeywords(array $schema): array
     {
         unset(
             $schema['additionalProperties'],
@@ -442,7 +441,7 @@ class Gemini extends AIProvider
 
         foreach ($schema as $key => $value) {
             if (is_array($value)) {
-                $schema[$key] = $this->stripGeminiUnsupportedKeywords($value);
+                $schema[$key] = $this->stripGoogleUnsupportedKeywords($value);
             }
         }
 
@@ -450,10 +449,10 @@ class Gemini extends AIProvider
     }
 
     /**
-     * @param list<mixed> $parts Gemini candidate content parts
+     * @param list<mixed> $parts Google candidate content parts
      * @return list<CanonicalContentBlockArray> canonical assistant content blocks
      */
-    private function geminiPartsToCanonical(array $parts): array
+    private function googlePartsToCanonical(array $parts): array
     {
         $canonical = [];
         foreach ($parts as $index => $part) {
@@ -473,12 +472,12 @@ class Gemini extends AIProvider
                 $normalizedInput = array_filter($args, function ($key) {
                     return is_string($key);
                 }, ARRAY_FILTER_USE_KEY);
-                // Gemini supplies no id; synthesize a deterministic one so the
+                // Google supplies no id; synthesize a deterministic one so the
                 // caller can echo it back and the id => name resolver can
                 // recover the function name on the next turn.
                 $canonical[] = [
                     'type' => 'tool_use',
-                    'id' => sprintf('gemini-%d-%s', $index, $name),
+                    'id' => sprintf('google-%d-%s', $index, $name),
                     'name' => $name,
                     'input' => $normalizedInput,
                 ];
@@ -490,7 +489,7 @@ class Gemini extends AIProvider
 
     /**
      * Any functionCall in the turn means the model wants a tool run; otherwise
-     * the Gemini finishReason maps onto the canonical stop reasons, passing
+     * the Google finishReason maps onto the canonical stop reasons, passing
      * unrecognised values through.
      *
      * @param list<CanonicalContentBlockArray> $content canonical assistant content blocks

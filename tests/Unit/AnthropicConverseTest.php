@@ -17,7 +17,7 @@ use Piwik\Plugins\AIProviders\AIProviderResponse;
 use Piwik\Plugins\AIProviders\AIRequest;
 use Piwik\Plugins\AIProviders\Exception\AIProviderClientException;
 use Piwik\Plugins\AIProviders\Provider\AIProvider;
-use Piwik\Plugins\AIProviders\Provider\Claude;
+use Piwik\Plugins\AIProviders\Provider\Anthropic;
 
 /**
  * Tests the full converse() translation between the canonical message shape
@@ -27,13 +27,13 @@ use Piwik\Plugins\AIProviders\Provider\Claude;
  * @group AIProviders
  * @group Plugins
  */
-class ClaudeConverseTest extends TestCase
+class AnthropicConverseTest extends TestCase
 {
     private const CONFIGURATION = ['apiKey' => 'secret-claude-key', 'endpointUrl' => ''];
 
     public function testPayloadUsesDefaultModelEndpointHeadersAndRequestDefaults(): void
     {
-        $claude = new RecordingClaude();
+        $claude = new RecordingAnthropic();
 
         $claude->converse($this->simpleRequest(), self::CONFIGURATION);
 
@@ -59,7 +59,7 @@ class ClaudeConverseTest extends TestCase
 
     public function testPayloadHonoursRequestedModelOptionsSystemPromptAndTimeout(): void
     {
-        $claude = new RecordingClaude();
+        $claude = new RecordingAnthropic();
 
         $request = $this->simpleRequest()
             ->withModel('claude-sonnet-4-5')
@@ -79,7 +79,7 @@ class ClaudeConverseTest extends TestCase
 
     public function testMessagesTranslateToAnthropicRolesAndBlocks(): void
     {
-        $claude = new RecordingClaude();
+        $claude = new RecordingAnthropic();
 
         $request = new AIConversationRequest(
             [
@@ -137,7 +137,7 @@ class ClaudeConverseTest extends TestCase
 
     public function testNonEmptyToolUseInputIsForwardedAsIs(): void
     {
-        $claude = new RecordingClaude();
+        $claude = new RecordingAnthropic();
 
         $request = new AIConversationRequest(
             [[
@@ -157,7 +157,7 @@ class ClaudeConverseTest extends TestCase
 
     public function testToolResultStructuredContentBecomesSingleJsonTextBlock(): void
     {
-        $claude = new RecordingClaude();
+        $claude = new RecordingAnthropic();
 
         $request = new AIConversationRequest(
             [[
@@ -185,7 +185,7 @@ class ClaudeConverseTest extends TestCase
 
     public function testToolResultTranslatesMcpBlocksAndStringifiesNonTextBlocks(): void
     {
-        $claude = new RecordingClaude();
+        $claude = new RecordingAnthropic();
 
         $request = new AIConversationRequest(
             [[
@@ -217,7 +217,7 @@ class ClaudeConverseTest extends TestCase
 
     public function testEmptyToolResultContentBecomesEmptyTextBlockAndErrorFlagPassesThrough(): void
     {
-        $claude = new RecordingClaude();
+        $claude = new RecordingAnthropic();
 
         $request = new AIConversationRequest(
             [[
@@ -248,7 +248,7 @@ class ClaudeConverseTest extends TestCase
 
     public function testToolsAreOmittedWhenCatalogueIsEmpty(): void
     {
-        $claude = new RecordingClaude();
+        $claude = new RecordingAnthropic();
 
         $claude->converse($this->simpleRequest(), self::CONFIGURATION);
 
@@ -257,7 +257,7 @@ class ClaudeConverseTest extends TestCase
 
     public function testToolCatalogueTranslatesToAnthropicToolsWithoutMcpHints(): void
     {
-        $claude = new RecordingClaude();
+        $claude = new RecordingAnthropic();
 
         $request = $this->simpleRequest()->withTools([
             [
@@ -293,7 +293,7 @@ class ClaudeConverseTest extends TestCase
 
     public function testResponseContentIsParsedIntoCanonicalBlocks(): void
     {
-        $claude = new RecordingClaude();
+        $claude = new RecordingAnthropic();
         $claude->cannedResponse = [
             'content' => [
                 ['type' => 'thinking', 'thinking' => 'Let me check the sites.'],
@@ -318,14 +318,14 @@ class ClaudeConverseTest extends TestCase
         $this->assertSame('tool_use', $response->getStopReason());
         $this->assertSame(12, $response->getInputTokens());
         $this->assertSame(7, $response->getOutputTokens());
-        $this->assertSame('claude', $response->getProviderId());
-        $this->assertSame('Claude', $response->getProviderName());
+        $this->assertSame('anthropic', $response->getProviderId());
+        $this->assertSame('Anthropic', $response->getProviderName());
         $this->assertSame('claude-haiku-4-5', $response->getModel());
     }
 
     public function testUnknownStopReasonPassesThrough(): void
     {
-        $claude = new RecordingClaude();
+        $claude = new RecordingAnthropic();
         $claude->cannedResponse = [
             'content' => [['type' => 'text', 'text' => 'Hi.']],
             'stop_reason' => 'refusal',
@@ -339,7 +339,7 @@ class ClaudeConverseTest extends TestCase
 
     public function testMissingUsageYieldsNullTokenCounts(): void
     {
-        $claude = new RecordingClaude();
+        $claude = new RecordingAnthropic();
         $claude->cannedResponse = [
             'content' => [['type' => 'text', 'text' => 'Hi.']],
             'stop_reason' => 'end_turn',
@@ -353,7 +353,7 @@ class ClaudeConverseTest extends TestCase
 
     public function testClaudeSupportsConversations(): void
     {
-        $this->assertTrue((new Claude())->supportsConversations());
+        $this->assertTrue((new Anthropic())->supportsConversations());
     }
 
     public function testProvidersWithoutConverseOverrideRejectConversations(): void
@@ -381,7 +381,7 @@ class ClaudeConverseTest extends TestCase
  * Records the wire request instead of performing HTTP and returns a canned
  * decoded response.
  */
-class RecordingClaude extends Claude
+class RecordingAnthropic extends Anthropic
 {
     /** @var string|null */
     public $sentUrl = null;

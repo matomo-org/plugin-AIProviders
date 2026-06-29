@@ -90,7 +90,7 @@ class ConverseServiceTest extends IntegrationTestCase
 
         $response = StaticContainer::get(AIProviderService::class)->converse($request);
 
-        $this->assertSame('claude', $response->getProviderId());
+        $this->assertSame('anthropic', $response->getProviderId());
         $this->assertSame([['type' => 'text', 'text' => 'Hello back.']], $response->getContent());
         $this->assertSame('Hello back.', $response->getText());
         $this->assertSame(AIConversationResponse::STOP_END_TURN, $response->getStopReason());
@@ -148,8 +148,8 @@ class ConverseServiceTest extends IntegrationTestCase
         // Simulate a managed environment forcing a conversation-capable
         // provider with config-file credentials.
         Config::getInstance()->AIProviders = [
-            'defaultProvider' => 'claude',
-            'claudeApiKey' => 'config-claude-key',
+            'defaultProvider' => 'anthropic',
+            'anthropicApiKey' => 'config-claude-key',
         ];
 
         $capturedUrl = null;
@@ -175,7 +175,7 @@ class ConverseServiceTest extends IntegrationTestCase
                 ->withModel('gpt-4o')
         );
 
-        $this->assertSame('claude', $response->getProviderId());
+        $this->assertSame('anthropic', $response->getProviderId());
         $this->assertSame('https://api.anthropic.com/v1/messages', $capturedUrl);
         $this->assertIsArray($capturedBody);
         // The requested model was stripped, so the forced provider's default is used.
@@ -187,7 +187,7 @@ class ConverseServiceTest extends IntegrationTestCase
         Config::getInstance()->AIProviders = [
             'defaultProvider' => 'openai',
             'openaiApiKey' => 'config-openai-key',
-            'claudeApiKey' => 'config-claude-key',
+            'anthropicApiKey' => 'config-claude-key',
             'providerSelectionAllowlist' => ['ExamplePlugin'],
         ];
 
@@ -208,11 +208,11 @@ class ConverseServiceTest extends IntegrationTestCase
                 [['role' => 'user', 'content' => [['type' => 'text', 'text' => 'Hello']]]],
                 'ExamplePlugin'
             ))
-                ->withProviderId('claude')
+                ->withProviderId('anthropic')
                 ->withModel('claude-sonnet-4-5')
         );
 
-        $this->assertSame('claude', $response->getProviderId());
+        $this->assertSame('anthropic', $response->getProviderId());
         $this->assertSame('https://api.anthropic.com/v1/messages', $capturedUrl);
         $this->assertIsArray($capturedBody);
         $this->assertSame('claude-sonnet-4-5', $capturedBody['model']);
@@ -255,8 +255,8 @@ class ConverseServiceTest extends IntegrationTestCase
 
     public function testCanConverseIsFalseWhenConversationCapableProviderIsNotConfigured(): void
     {
-        // A managed environment forces Claude, but no credentials are available.
-        Config::getInstance()->AIProviders = ['defaultProvider' => 'claude'];
+        // A managed environment forces Anthropic, but no credentials are available.
+        Config::getInstance()->AIProviders = ['defaultProvider' => 'anthropic'];
 
         $this->assertFalse(StaticContainer::get(AIProviderService::class)->canConverse());
     }
@@ -271,10 +271,10 @@ class ConverseServiceTest extends IntegrationTestCase
     private function configureClaudeAsDefaultProvider(): void
     {
         $this->api->saveSettings(
-            'claude',
+            'anthropic',
             Configuration::CAPABILITY_INSTANT,
             (string) json_encode([
-                'claude' => ['apiKey' => 'secret-claude-key', 'endpointUrl' => ''],
+                'anthropic' => ['apiKey' => 'secret-claude-key', 'endpointUrl' => ''],
             ])
         );
     }

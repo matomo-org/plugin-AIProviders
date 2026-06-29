@@ -100,20 +100,20 @@ class ConfigurationTest extends IntegrationTestCase
     public function testSaveSettingsStoresApiKeyWithoutReturningIt(): void
     {
         $settings = $this->api->saveSettings(
-            'claude',
+            'anthropic',
             Configuration::CAPABILITY_THINKING,
             (string) json_encode([
-                'claude' => [
+                'anthropic' => [
                     'apiKey' => 'secret-claude-key',
                     'endpointUrl' => '',
                 ],
             ])
         );
 
-        $this->assertSame('claude', $settings['defaultProviderId']);
+        $this->assertSame('anthropic', $settings['defaultProviderId']);
         $this->assertSame(Configuration::CAPABILITY_THINKING, $settings['defaultCapabilityLevel']);
 
-        $claude = $this->getProvider($settings, 'claude');
+        $claude = $this->getProvider($settings, 'anthropic');
         $this->assertTrue($claude['configuration']['hasApiKey']);
         $this->assertTrue($claude['configuration']['isUsable']);
         $this->assertArrayNotHasKey('apiKey', $claude['configuration']);
@@ -128,30 +128,30 @@ class ConfigurationTest extends IntegrationTestCase
         $apiKey = 'secret&claude<key>"123"';
 
         $settings = $this->api->saveSettings(
-            'claude',
+            'anthropic',
             Configuration::CAPABILITY_THINKING,
             (string) json_encode([
-                'claude' => [
+                'anthropic' => [
                     'apiKey' => $apiKey,
                     'endpointUrl' => '',
                 ],
             ])
         );
 
-        $claude = $this->getProvider($settings, 'claude');
+        $claude = $this->getProvider($settings, 'anthropic');
         $this->assertTrue($claude['configuration']['hasApiKey']);
 
-        $stored = StaticContainer::get(Configuration::class)->getProviderConfiguration('claude');
+        $stored = StaticContainer::get(Configuration::class)->getProviderConfiguration('anthropic');
         $this->assertSame($apiKey, $stored['apiKey']);
     }
 
     public function testSaveSettingsPreservesExistingApiKeyWhenInputIsEmpty(): void
     {
         $this->api->saveSettings(
-            'claude',
+            'anthropic',
             Configuration::CAPABILITY_THINKING,
             (string) json_encode([
-                'claude' => [
+                'anthropic' => [
                     'apiKey' => 'secret-claude-key',
                     'endpointUrl' => '',
                 ],
@@ -159,27 +159,27 @@ class ConfigurationTest extends IntegrationTestCase
         );
 
         $settings = $this->api->saveSettings(
-            'claude',
+            'anthropic',
             Configuration::CAPABILITY_INSTANT,
             (string) json_encode([
-                'claude' => [
+                'anthropic' => [
                     'apiKey' => '',
                     'endpointUrl' => '',
                 ],
             ])
         );
 
-        $claude = $this->getProvider($settings, 'claude');
+        $claude = $this->getProvider($settings, 'anthropic');
         $this->assertTrue($claude['configuration']['hasApiKey']);
     }
 
     public function testServiceReturnsServerSideDefaultProviderConfiguration(): void
     {
         $this->api->saveSettings(
-            'claude',
+            'anthropic',
             Configuration::CAPABILITY_THINKING,
             (string) json_encode([
-                'claude' => [
+                'anthropic' => [
                     'apiKey' => 'secret-claude-key',
                     'endpointUrl' => '',
                 ],
@@ -188,12 +188,12 @@ class ConfigurationTest extends IntegrationTestCase
 
         $service = StaticContainer::get(AIProviderService::class);
 
-        $this->assertSame('claude', $service->getDefaultProvider()->getId());
+        $this->assertSame('anthropic', $service->getDefaultProvider()->getId());
         $this->assertSame(Configuration::CAPABILITY_THINKING, $service->getDefaultCapabilityLevel());
         // The stored credentials stay internal to the plugin; the service does
         // not expose them. They are only resolvable through the Configuration.
         $configuration = StaticContainer::get(Configuration::class);
-        $this->assertSame('secret-claude-key', $configuration->getProviderConfiguration('claude')['apiKey']);
+        $this->assertSame('secret-claude-key', $configuration->getProviderConfiguration('anthropic')['apiKey']);
         $this->assertFalse(method_exists($service, 'getDefaultProviderConfiguration'));
     }
 
@@ -339,7 +339,7 @@ class ConfigurationTest extends IntegrationTestCase
         $this->mockAIProviderResponse('Because molecules scatter blue light more strongly.');
 
         $response = StaticContainer::get(AIProviderService::class)
-            ->complete((new AIRequest('why is the sky blue', 'Test'))->withProviderId('claude'));
+            ->complete((new AIRequest('why is the sky blue', 'Test'))->withProviderId('anthropic'));
 
         $this->assertSame('openai', $response->toArray()['providerId']);
     }
@@ -397,11 +397,11 @@ class ConfigurationTest extends IntegrationTestCase
 
         $response = StaticContainer::get(AIProviderService::class)->complete(
             (new AIRequest('What do you know about brand X?', 'ExamplePlugin'))
-                ->withProviderId('claude')
+                ->withProviderId('anthropic')
                 ->withModel('claude-sonnet-4-5')
         );
 
-        $this->assertSame('claude', $response->toArray()['providerId']);
+        $this->assertSame('anthropic', $response->toArray()['providerId']);
         $this->assertSame('https://api.anthropic.com/v1/messages', $capturedUrl);
         $this->assertIsArray($capturedBody);
         $this->assertSame('claude-sonnet-4-5', $capturedBody['model']);
@@ -417,12 +417,12 @@ class ConfigurationTest extends IntegrationTestCase
         ];
 
         // mockAIProviderResponse() asserts the OpenAI endpoint is called, so a
-        // request to Claude would fail this test.
+        // request to Anthropic would fail this test.
         $this->mockAIProviderResponse('Because molecules scatter blue light more strongly.');
 
         $response = StaticContainer::get(AIProviderService::class)->complete(
             (new AIRequest('why is the sky blue', 'Goals'))
-                ->withProviderId('claude')
+                ->withProviderId('anthropic')
                 ->withModel('claude-sonnet-4-5')
         );
 
@@ -449,7 +449,7 @@ class ConfigurationTest extends IntegrationTestCase
 
     public function testAllowlistedCallerRequestingUnconfiguredProviderFailsInsteadOfFallingBack(): void
     {
-        // Only OpenAI is configured; Claude is requested. Falling back to the
+        // Only OpenAI is configured; Anthropic is requested. Falling back to the
         // forced provider would silently answer from the wrong engine, so a
         // clear error is expected instead.
         $this->api->saveSettings(
@@ -466,11 +466,11 @@ class ConfigurationTest extends IntegrationTestCase
         ];
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('No API key is configured for Claude.');
+        $this->expectExceptionMessage('No API key is configured for Anthropic.');
 
         StaticContainer::get(AIProviderService::class)->complete(
             (new AIRequest('What do you know about brand X?', 'ExamplePlugin'))
-                ->withProviderId('claude')
+                ->withProviderId('anthropic')
         );
     }
 
@@ -525,7 +525,7 @@ class ConfigurationTest extends IntegrationTestCase
         Config::getInstance()->AIProviders = [
             'defaultProvider' => 'openai',
             'openaiApiKey' => 'config-openai-key',
-            'claudeApiKey' => 'config-claude-key',
+            'anthropicApiKey' => 'config-claude-key',
             'providerSelectionAllowlist' => ['ExamplePlugin'],
         ];
         $this->restrictSelectableProvidersTo('openai');
@@ -537,11 +537,11 @@ class ConfigurationTest extends IntegrationTestCase
 
         $response = StaticContainer::get(AIProviderService::class)->complete(
             (new AIRequest('What do you know about brand X?', 'ExamplePlugin'))
-                ->withProviderId('claude')
+                ->withProviderId('anthropic')
                 ->withModel('claude-sonnet-4-5')
         );
 
-        $this->assertSame('claude', $response->toArray()['providerId']);
+        $this->assertSame('anthropic', $response->toArray()['providerId']);
         $this->assertSame('Brand X is a well-known brand.', $response->getText());
         $this->assertSame('https://api.anthropic.com/v1/messages', $capturedUrl);
         $this->assertSame('claude-sonnet-4-5', $capturedBody['model']);
@@ -567,10 +567,10 @@ class ConfigurationTest extends IntegrationTestCase
         $this->restrictSelectableProvidersTo('openai');
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Unknown AI provider "claude".');
+        $this->expectExceptionMessage('Unknown AI provider "anthropic".');
 
         $this->api->testConnection(
-            'claude',
+            'anthropic',
             (string) json_encode([
                 'apiKey' => 'secret-claude-key',
                 'endpointUrl' => '',
@@ -583,9 +583,9 @@ class ConfigurationTest extends IntegrationTestCase
         $this->restrictSelectableProvidersTo('openai');
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Unknown AI provider "claude".');
+        $this->expectExceptionMessage('Unknown AI provider "anthropic".');
 
-        $this->api->disconnectProvider('claude');
+        $this->api->disconnectProvider('anthropic');
     }
 
     public function testRestrictedProviderCannotBeSavedAsDefault(): void
@@ -593,13 +593,13 @@ class ConfigurationTest extends IntegrationTestCase
         $this->restrictSelectableProvidersTo('openai');
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Unknown AI provider "claude".');
+        $this->expectExceptionMessage('Unknown AI provider "anthropic".');
 
         $this->api->saveSettings(
-            'claude',
+            'anthropic',
             Configuration::CAPABILITY_INSTANT,
             (string) json_encode([
-                'claude' => ['apiKey' => 'secret-claude-key', 'endpointUrl' => ''],
+                'anthropic' => ['apiKey' => 'secret-claude-key', 'endpointUrl' => ''],
             ])
         );
     }
@@ -616,7 +616,7 @@ class ConfigurationTest extends IntegrationTestCase
 
         // After the saved default provider becomes restricted, resolution must
         // not pick it (or any other restricted provider) as the default.
-        $this->restrictSelectableProvidersTo('claude');
+        $this->restrictSelectableProvidersTo('anthropic');
 
         $settings = $this->api->getSettings();
 
@@ -734,7 +734,7 @@ class ConfigurationTest extends IntegrationTestCase
         });
 
         $response = $this->api->testConnection(
-            'gemini',
+            'google',
             (string) json_encode([
                 'apiKey' => 'secret-gemini-key',
                 'endpointUrl' => '',
@@ -742,8 +742,8 @@ class ConfigurationTest extends IntegrationTestCase
         );
 
         $this->assertSame(2, $requests);
-        $this->assertSame('gemini', $response['providerId']);
-        $this->assertSame('Gemini', $response['providerName']);
+        $this->assertSame('google', $response['providerId']);
+        $this->assertSame('Google', $response['providerName']);
     }
 
     public function testDisconnectProviderRemovesStoredApiKey(): void
@@ -826,7 +826,7 @@ class ConfigurationTest extends IntegrationTestCase
     }
 
     /**
-     * Stores credentials for OpenAI and Claude while the instance is still
+     * Stores credentials for OpenAI and Anthropic while the instance is still
      * unmanaged, so managed-mode tests can then force a provider via config.
      */
     private function saveOpenAiAndClaudeKeys(): void
@@ -836,7 +836,7 @@ class ConfigurationTest extends IntegrationTestCase
             Configuration::CAPABILITY_INSTANT,
             (string) json_encode([
                 'openai' => ['apiKey' => 'secret-openai-key', 'endpointUrl' => ''],
-                'claude' => ['apiKey' => 'secret-claude-key', 'endpointUrl' => ''],
+                'anthropic' => ['apiKey' => 'secret-claude-key', 'endpointUrl' => ''],
             ])
         );
     }

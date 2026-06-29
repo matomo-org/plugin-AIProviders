@@ -27,8 +27,8 @@ class AIConversationResponseTest extends TestCase
         ];
 
         $response = new AIConversationResponse(
-            'claude',
-            'Claude',
+            'anthropic',
+            'Anthropic',
             'claude-haiku-4-5',
             $content,
             AIConversationResponse::STOP_TOOL_USE,
@@ -37,8 +37,8 @@ class AIConversationResponseTest extends TestCase
             450
         );
 
-        $this->assertSame('claude', $response->getProviderId());
-        $this->assertSame('Claude', $response->getProviderName());
+        $this->assertSame('anthropic', $response->getProviderId());
+        $this->assertSame('Anthropic', $response->getProviderName());
         $this->assertSame('claude-haiku-4-5', $response->getModel());
         $this->assertSame($content, $response->getContent());
         $this->assertSame(AIConversationResponse::STOP_TOOL_USE, $response->getStopReason());
@@ -50,8 +50,8 @@ class AIConversationResponseTest extends TestCase
     public function testTokensAndExecutionTimeDefaultToNull(): void
     {
         $response = new AIConversationResponse(
-            'claude',
-            'Claude',
+            'anthropic',
+            'Anthropic',
             'claude-haiku-4-5',
             [],
             AIConversationResponse::STOP_END_TURN
@@ -65,8 +65,8 @@ class AIConversationResponseTest extends TestCase
     public function testGetTextConcatenatesTextBlocksAndIgnoresOtherBlocks(): void
     {
         $response = new AIConversationResponse(
-            'claude',
-            'Claude',
+            'anthropic',
+            'Anthropic',
             'claude-haiku-4-5',
             [
                 ['type' => 'text', 'text' => 'First paragraph.'],
@@ -86,8 +86,8 @@ class AIConversationResponseTest extends TestCase
     public function testGetTextReturnsEmptyStringForToolOnlyTurn(): void
     {
         $response = new AIConversationResponse(
-            'claude',
-            'Claude',
+            'anthropic',
+            'Anthropic',
             'claude-haiku-4-5',
             [['type' => 'tool_use', 'id' => 'tu_1', 'name' => 'matomo_site_list', 'input' => []]],
             AIConversationResponse::STOP_TOOL_USE

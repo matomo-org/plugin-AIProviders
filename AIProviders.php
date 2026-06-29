@@ -34,8 +34,8 @@ class AIProviders extends Plugin
      */
     public function addAIProviders(AIProvidersList $providers): void
     {
-        $providers->addProvider(new Provider\Claude());
-        $providers->addProvider(new Provider\Gemini());
+        $providers->addProvider(new Provider\Anthropic());
+        $providers->addProvider(new Provider\Google());
         $providers->addProvider(new Provider\OpenAI());
         $providers->addProvider(new Provider\CustomProvider());
     }

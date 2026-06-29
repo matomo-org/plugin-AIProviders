@@ -56,8 +56,7 @@ namespace Piwik\Plugins\AIProviders;
  *     Where `content` is the MCP content block list emitted by the tool
  *     (each `{type: 'text' | 'image' | …, …}`) and `structuredContent`
  *     carries the tool's optional structured output word for word. Providers with
- *     a native JSON return path (for example Bedrock's `{json}` block) will
- *     prefer `structuredContent` when present.
+ *     a native JSON return path will prefer `structuredContent` when present.
  *
  * ## Importable PHPStan types
  *

@@ -61,7 +61,7 @@ class AIConversationRequestTest extends TestCase
         $modified = $request
             ->withSystemPrompt('System')
             ->withTools($tools)
-            ->withProviderId('claude')
+            ->withProviderId('anthropic')
             ->withModel('claude-haiku-4-5')
             ->withFeatureKey('chat')
             ->withMaxTokens(4096)
@@ -81,7 +81,7 @@ class AIConversationRequestTest extends TestCase
         // The derived request carries the new values.
         $this->assertSame('System', $modified->getSystemPrompt());
         $this->assertSame($tools, $modified->getTools());
-        $this->assertSame('claude', $modified->getProviderId());
+        $this->assertSame('anthropic', $modified->getProviderId());
         $this->assertSame('claude-haiku-4-5', $modified->getModel());
         $this->assertSame('chat', $modified->getFeatureKey());
         $this->assertSame(4096, $modified->getMaxTokens());
@@ -99,7 +99,7 @@ class AIConversationRequestTest extends TestCase
 
         $this->assertNotSame($request, $request->withSystemPrompt('System'));
         $this->assertNotSame($request, $request->withTools([]));
-        $this->assertNotSame($request, $request->withProviderId('claude'));
+        $this->assertNotSame($request, $request->withProviderId('anthropic'));
         $this->assertNotSame($request, $request->withModel('claude-haiku-4-5'));
         $this->assertNotSame($request, $request->withFeatureKey('chat'));
         $this->assertNotSame($request, $request->withMaxTokens(1));

@@ -22,7 +22,7 @@ use Piwik\Plugins\AIProviders\CanonicalMessage;
  * @phpstan-import-type CanonicalContentBlockArray from CanonicalMessage
  * @phpstan-import-type ToolCatalogEntryArray from AIConversationRequest
  */
-class Claude extends AIProvider
+class Anthropic extends AIProvider
 {
     private const DEFAULT_MODEL = 'claude-haiku-4-5';
     private const ANTHROPIC_VERSION = '2023-06-01';
@@ -35,11 +35,10 @@ class Claude extends AIProvider
     public function __construct()
     {
         parent::__construct(
-            'claude',
-            'Claude',
+            'anthropic',
+            'Anthropic',
             'AIProviders_AnthropicDefaultModelDescription',
-            false,
-            'Anthropic'
+            false
         );
     }
 
@@ -54,7 +53,7 @@ class Claude extends AIProvider
     }
 
     /**
-     * Custom Claude chat completion method.
+     * Custom Anthropic chat completion method.
      * @see https://platform.claude.com/docs/en/api/messages/create
      * @param array<string, string> $configuration
      */

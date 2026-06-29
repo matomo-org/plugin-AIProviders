@@ -70,7 +70,7 @@ function selectProvider() {
     <div class="ai-providers-card-inner">
       <div class="ai-providers-card-heading">
         <div class="ai-providers-card-header">
-          <span class="ai-providers-card-name">{{ provider.displayName }}</span>
+          <span class="ai-providers-card-name">{{ provider.name }}</span>
           <span
             v-if="selected"
             class="ai-providers-card-default"
@@ -87,6 +87,7 @@ function selectProvider() {
       <template v-if="canEdit">
         <Field
           v-if="provider.supportsCustomEndpoint"
+          class="ai-providers-endpoint-field"
           :model-value="configuration?.endpointUrl"
           :name="`endpointUrl-${provider.id}`"
           :title="translate('AIProviders_EndpointUrl')"
@@ -258,6 +259,10 @@ function selectProvider() {
     margin-bottom: 0;
     width: 100%;
     box-sizing: border-box;
+  }
+
+  .matomo-form-field.ai-providers-endpoint-field {
+    margin-bottom: 16px;
   }
 }
 

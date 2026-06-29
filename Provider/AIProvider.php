@@ -60,11 +60,6 @@ abstract class AIProvider
     private $description;
 
     /**
-     * @var string
-     */
-    private $displayName;
-
-    /**
      * @var bool
      */
     private $supportsCustomEndpoint;
@@ -78,13 +73,11 @@ abstract class AIProvider
         string $id,
         string $name,
         string $description,
-        bool $supportsCustomEndpoint = false,
-        string $displayName = ''
+        bool $supportsCustomEndpoint = false
     ) {
         $this->id = $id;
         $this->name = $name;
         $this->description = $description;
-        $this->displayName = $displayName;
         $this->supportsCustomEndpoint = $supportsCustomEndpoint;
     }
 
@@ -96,11 +89,6 @@ abstract class AIProvider
     public function getName(): string
     {
         return $this->name;
-    }
-
-    public function getDisplayName(): string
-    {
-        return $this->displayName ?: $this->getName();
     }
 
     public function getDescription(): string
@@ -338,7 +326,7 @@ abstract class AIProvider
     protected function isWebSearchUsed(AIRequest $request): bool
     {
         // TODO: Implement provider-specific web search/tool configuration for
-        // OpenAI, Gemini, Claude, and managed providers separately.
+        // OpenAI, Google, Anthropic, and managed providers separately.
         return false;
     }
 
@@ -678,7 +666,7 @@ abstract class AIProvider
     }
 
     /**
-     * Makes a tool's parameter schema acceptable to OpenAI and Gemini.
+     * Makes a tool's parameter schema acceptable to OpenAI and Google.
      *
      * Both reject certain keywords at the top level of the schema
      * (`oneOf`/`anyOf`/`allOf`/`not`/`enum`/`const`), so this method strips them and
@@ -689,9 +677,9 @@ abstract class AIProvider
      * are left untouched, and `additionalProperties` are kept on purpose
      * (OpenAI's strict mode requires it).
      *
-     * Claude and Bedrock accept the original schema and skip this entirely.
-     * Gemini is stricter and adds a deeper recursive strip on top, in
-     * {@see Gemini::geminiParameterSchema()}.
+     * Anthropic accepts the original schema and skips this entirely.
+     * Google is stricter and adds a deeper recursive strip on top, in
+     * {@see Google::googleParameterSchema()}.
      *
      * @param array<string, mixed> $schema
      * @return array<string, mixed>
@@ -784,7 +772,6 @@ abstract class AIProvider
      * @return array{
      *     id: string,
      *     name: string,
-     *     displayName: string,
      *     description: string,
      *     supportsCustomEndpoint: bool,
      *     defaultModel: string
@@ -795,7 +782,6 @@ abstract class AIProvider
         return [
             'id' => $this->getId(),
             'name' => $this->getName(),
-            'displayName' => $this->getDisplayName(),
             'description' => $this->getDescription(),
             'supportsCustomEndpoint' => $this->supportsCustomEndpoint(),
             'defaultModel' => $this->getDefaultModel(),

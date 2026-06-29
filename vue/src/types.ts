@@ -14,7 +14,6 @@ export interface ProviderConfiguration {
 export interface Provider {
   id: string;
   name: string;
-  displayName: string;
   description: string;
   supportsCustomEndpoint: boolean;
   defaultModel: string;

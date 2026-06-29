@@ -13,7 +13,7 @@ namespace Piwik\Plugins\AIProviders\tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use Piwik\Plugins\AIProviders\AIProvidersList;
-use Piwik\Plugins\AIProviders\Provider\Claude;
+use Piwik\Plugins\AIProviders\Provider\Anthropic;
 use Piwik\Plugins\AIProviders\Provider\OpenAI;
 
 /**
@@ -57,19 +57,19 @@ class AIProvidersListTest extends TestCase
     {
         $providers = new AIProvidersList();
         $providers->addProvider(new OpenAI());
-        $providers->addProvider(new Claude());
+        $providers->addProvider(new Anthropic());
 
-        $providers->setSelectable('claude', false);
+        $providers->setSelectable('anthropic', false);
 
-        $this->assertFalse($providers->isSelectable('claude'));
+        $this->assertFalse($providers->isSelectable('anthropic'));
         $this->assertTrue($providers->isSelectable('openai'));
         $this->assertCount(2, $providers->getProviders());
         $this->assertCount(1, $providers->getSelectableProviders());
         $this->assertSame('openai', $providers->getSelectableProviders()[0]->getId());
 
-        $providers->setSelectable('claude', true);
+        $providers->setSelectable('anthropic', true);
 
-        $this->assertTrue($providers->isSelectable('claude'));
+        $this->assertTrue($providers->isSelectable('anthropic'));
         $this->assertCount(2, $providers->getSelectableProviders());
     }
 

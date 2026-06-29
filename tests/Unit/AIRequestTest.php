@@ -44,7 +44,7 @@ class AIRequestTest extends TestCase
 
         $modified = $request
             ->withSystemPrompt('System')
-            ->withProviderId('claude')
+            ->withProviderId('anthropic')
             ->withModel('claude-haiku-4-5')
             ->withCapabilityLevel('thinking')
             ->withFeatureKey('goal-recommendation')
@@ -62,7 +62,7 @@ class AIRequestTest extends TestCase
 
         // The derived request carries the new values.
         $this->assertSame('System', $modified->getSystemPrompt());
-        $this->assertSame('claude', $modified->getProviderId());
+        $this->assertSame('anthropic', $modified->getProviderId());
         $this->assertSame('claude-haiku-4-5', $modified->getModel());
         $this->assertSame('thinking', $modified->getCapabilityLevel());
         $this->assertSame('goal-recommendation', $modified->getFeatureKey());

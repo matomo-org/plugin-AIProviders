@@ -14,9 +14,9 @@ namespace Piwik\Plugins\AIProviders\tests\Unit;
 use PHPUnit\Framework\TestCase;
 use Piwik\Plugins\AIProviders\AIRequest;
 use Piwik\Plugins\AIProviders\Model\Configuration;
-use Piwik\Plugins\AIProviders\Provider\Claude;
+use Piwik\Plugins\AIProviders\Provider\Anthropic;
 use Piwik\Plugins\AIProviders\Provider\CustomProvider;
-use Piwik\Plugins\AIProviders\Provider\Gemini;
+use Piwik\Plugins\AIProviders\Provider\Google;
 use Piwik\Plugins\AIProviders\Provider\OpenAI;
 
 /**
@@ -54,7 +54,7 @@ class CapabilityThinkingTest extends TestCase
 
     public function testClaudeInstantSendsNoThinkingBlock(): void
     {
-        $claude = new RecordingCompleteClaude();
+        $claude = new RecordingCompleteAnthropic();
 
         $claude->complete($this->instantRequest(), self::CLAUDE_CONFIG);
 
@@ -64,7 +64,7 @@ class CapabilityThinkingTest extends TestCase
 
     public function testClaudeThinkingEnablesThinkingBumpsMaxTokensAndDropsTemperature(): void
     {
-        $claude = new RecordingCompleteClaude();
+        $claude = new RecordingCompleteAnthropic();
 
         // Default max_tokens (1024) is below the thinking budget, so it must be
         // bumped above the budget; temperature must be dropped.
@@ -78,7 +78,7 @@ class CapabilityThinkingTest extends TestCase
 
     public function testGeminiInstantDisablesThinkingBudget(): void
     {
-        $gemini = new RecordingCompleteGemini();
+        $gemini = new RecordingCompleteGoogle();
 
         $gemini->complete($this->instantRequest(), self::GEMINI_CONFIG);
 
@@ -87,7 +87,7 @@ class CapabilityThinkingTest extends TestCase
 
     public function testGeminiThinkingSetsPositiveThinkingBudget(): void
     {
-        $gemini = new RecordingCompleteGemini();
+        $gemini = new RecordingCompleteGoogle();
 
         $gemini->complete($this->thinkingRequest(), self::GEMINI_CONFIG);
 
@@ -143,7 +143,7 @@ class RecordingCompleteOpenAI extends OpenAI
     }
 }
 
-class RecordingCompleteClaude extends Claude
+class RecordingCompleteAnthropic extends Anthropic
 {
     /** @var array<string, mixed> */
     public $sentPayload = [];
@@ -156,7 +156,7 @@ class RecordingCompleteClaude extends Claude
     }
 }
 
-class RecordingCompleteGemini extends Gemini
+class RecordingCompleteGoogle extends Google
 {
     /** @var array<string, mixed> */
     public $sentPayload = [];

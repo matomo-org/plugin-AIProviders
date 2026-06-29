@@ -5,7 +5,7 @@
 
 Configure AI provider connections and default model settings used by Matomo AI features.
 
-Built-in providers: Claude, OpenAI, Gemini, and a generic custom provider for OpenAI-compatible endpoints.
+Built-in providers: Anthropic, OpenAI, Google, and a generic custom provider for OpenAI-compatible endpoints.
 
 ## Configuration
 
@@ -95,7 +95,7 @@ $response = $service->complete(
 $data = $response->getJsonData(); // array, or null if the model did not return valid JSON
 ```
 
-Each provider asks for JSON the best way it can — `response_format` (OpenAI-compatible), `responseMimeType` (Gemini) — and AIProviders always adds a system instruction to return a single JSON object, so it works for providers without a native option (for example Claude) too. The model can still occasionally return invalid JSON, so always handle a `null` from `getJsonData()`.
+Each provider asks for JSON the best way it can — `response_format` (OpenAI-compatible), `responseMimeType` (Google) — and AIProviders always adds a system instruction to return a single JSON object, so it works for providers without a native option (for example Anthropic) too. The model can still occasionally return invalid JSON, so always handle a `null` from `getJsonData()`.
 
 ## Conversations (multi-turn, tool calling)
 

@@ -14,23 +14,23 @@ namespace Piwik\Plugins\AIProviders\tests\Unit;
 use PHPUnit\Framework\TestCase;
 use Piwik\Plugins\AIProviders\AIConversationRequest;
 use Piwik\Plugins\AIProviders\AIRequest;
-use Piwik\Plugins\AIProviders\Provider\Gemini;
+use Piwik\Plugins\AIProviders\Provider\Google;
 
 /**
  * Tests the full converse() translation between the canonical message shape
- * and the Gemini generateContent API wire format, with HTTP replaced by a
+ * and the Google generateContent API wire format, with HTTP replaced by a
  * recording sendJsonRequest() override.
  *
  * @group AIProviders
  * @group Plugins
  */
-class GeminiConverseTest extends TestCase
+class GoogleConverseTest extends TestCase
 {
     private const CONFIGURATION = ['apiKey' => 'secret-gemini-key', 'endpointUrl' => ''];
 
     public function testPayloadUsesDefaultModelEndpointHeadersAndRequestDefaults(): void
     {
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
 
         $gemini->converse($this->simpleRequest(), self::CONFIGURATION);
 
@@ -56,7 +56,7 @@ class GeminiConverseTest extends TestCase
 
     public function testPayloadHonoursRequestedModelOptionsSystemPromptAndTimeout(): void
     {
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
 
         $request = $this->simpleRequest()
             ->withModel('gemini-2.5-pro')
@@ -79,7 +79,7 @@ class GeminiConverseTest extends TestCase
 
     public function testMessagesTranslateToGeminiRolesAndParts(): void
     {
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
 
         $request = new AIConversationRequest(
             [
@@ -110,7 +110,7 @@ class GeminiConverseTest extends TestCase
         $contents = $gemini->sentPayload['contents'];
 
         $this->assertCount(3, $contents);
-        // Canonical 'assistant' becomes Gemini 'model'; the 'tool' result folds
+        // Canonical 'assistant' becomes Google 'model'; the 'tool' result folds
         // into a 'user' message carrying a functionResponse part.
         $this->assertSame(['user', 'model', 'user'], array_column($contents, 'role'));
 
@@ -136,7 +136,7 @@ class GeminiConverseTest extends TestCase
 
     public function testNonEmptyToolUseInputIsForwardedAsArgs(): void
     {
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
 
         $request = new AIConversationRequest(
             [[
@@ -156,7 +156,7 @@ class GeminiConverseTest extends TestCase
 
     public function testToolResultNameFallsBackToUnknownWhenUnresolvable(): void
     {
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
 
         $request = new AIConversationRequest(
             [[
@@ -182,7 +182,7 @@ class GeminiConverseTest extends TestCase
 
     public function testToolResultStructuredContentBecomesResponseObject(): void
     {
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
 
         $request = new AIConversationRequest(
             [[
@@ -209,7 +209,7 @@ class GeminiConverseTest extends TestCase
 
     public function testToolResultMcpTextFallbackIsWrappedInObjectAndErrorReflected(): void
     {
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
 
         $request = new AIConversationRequest(
             [[
@@ -241,7 +241,7 @@ class GeminiConverseTest extends TestCase
 
     public function testToolsAreOmittedWhenCatalogueIsEmpty(): void
     {
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
 
         $gemini->converse($this->simpleRequest(), self::CONFIGURATION);
 
@@ -250,7 +250,7 @@ class GeminiConverseTest extends TestCase
 
     public function testToolCatalogueTranslatesToFunctionDeclarationsWithoutMcpHints(): void
     {
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
 
         $request = $this->simpleRequest()->withTools([
             [
@@ -287,14 +287,14 @@ class GeminiConverseTest extends TestCase
 
     public function testToolSchemaUnsupportedKeywordsAreStrippedForGemini(): void
     {
-        // Gemini's function declaration schema accepts only a restricted subset
+        // Google's function declaration schema accepts only a restricted subset
         // of OpenAPI 3.0 and rejects standard JSON Schema keywords such as
         // top-level oneOf/anyOf/allOf/not/enum/const AND additionalProperties at
         // every nesting depth (the real API errors on
         // parameters.properties[...].additionalProperties). They are
         // validation-only constraints re-checked by the tool server on call, so
         // they are dropped rather than failing the turn.
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
 
         $request = $this->simpleRequest()->withTools([
             [
@@ -342,7 +342,7 @@ class GeminiConverseTest extends TestCase
 
     public function testResponsePartsAreParsedIntoCanonicalBlocks(): void
     {
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
         $gemini->cannedResponse = [
             'candidates' => [[
                 'content' => [
@@ -372,13 +372,13 @@ class GeminiConverseTest extends TestCase
         $this->assertSame('tool_use', $response->getStopReason());
         $this->assertSame(12, $response->getInputTokens());
         $this->assertSame(7, $response->getOutputTokens());
-        $this->assertSame('gemini', $response->getProviderId());
+        $this->assertSame('google', $response->getProviderId());
         $this->assertSame('gemini-2.5-flash-lite', $response->getModel());
     }
 
     public function testSynthesizedIdResolvesBackToFunctionNameOnFollowUpTurn(): void
     {
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
         $gemini->cannedResponse = [
             'candidates' => [[
                 'content' => ['parts' => [
@@ -417,7 +417,7 @@ class GeminiConverseTest extends TestCase
 
     public function testFinishReasonStopWithoutCallsYieldsEndTurn(): void
     {
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
         $gemini->cannedResponse = [
             'candidates' => [[
                 'content' => ['parts' => [['text' => 'All done.']]],
@@ -432,7 +432,7 @@ class GeminiConverseTest extends TestCase
 
     public function testFinishReasonMaxTokensMapsToMaxTokens(): void
     {
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
         $gemini->cannedResponse = [
             'candidates' => [[
                 'content' => ['parts' => [['text' => 'Truncated']]],
@@ -447,7 +447,7 @@ class GeminiConverseTest extends TestCase
 
     public function testUnknownFinishReasonPassesThrough(): void
     {
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
         $gemini->cannedResponse = [
             'candidates' => [[
                 'content' => ['parts' => [['text' => 'Hi.']]],
@@ -462,7 +462,7 @@ class GeminiConverseTest extends TestCase
 
     public function testMissingUsageYieldsNullTokenCounts(): void
     {
-        $gemini = new RecordingGemini();
+        $gemini = new RecordingGoogle();
         $gemini->cannedResponse = [
             'candidates' => [[
                 'content' => ['parts' => [['text' => 'Hi.']]],
@@ -478,7 +478,7 @@ class GeminiConverseTest extends TestCase
 
     public function testGeminiSupportsConversations(): void
     {
-        $this->assertTrue((new Gemini())->supportsConversations());
+        $this->assertTrue((new Google())->supportsConversations());
     }
 
     private function simpleRequest(): AIConversationRequest
@@ -494,7 +494,7 @@ class GeminiConverseTest extends TestCase
  * Records the wire request instead of performing HTTP and returns a canned
  * decoded response.
  */
-class RecordingGemini extends Gemini
+class RecordingGoogle extends Google
 {
     /** @var string|null */
     public $sentUrl = null;
