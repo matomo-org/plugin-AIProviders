@@ -27,7 +27,7 @@ export interface Provider {
 
 export interface CapabilityLevel {
   label: string;
-  description: string;
+  description?: string;
 }
 
 export interface Settings {

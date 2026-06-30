@@ -279,7 +279,7 @@ function selectProvider() {
   padding: 3px 8px;
   background-color: var(--ai-providers-accent);
   color: var(--theme-color-brand-contrast);
-  border-radius: 4px;
+  border-radius: 3px;
   font-size: 10px;
   font-weight: 700;
   line-height: 1.5;

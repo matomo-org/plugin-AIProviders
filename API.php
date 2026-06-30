@@ -11,7 +11,6 @@ declare(strict_types=1);
 
 namespace Piwik\Plugins\AIProviders;
 
-use Exception;
 use Piwik\Piwik;
 use Piwik\Plugin\API as PluginAPI;
 use Piwik\Plugins\AIProviders\Model\Configuration;
@@ -49,7 +48,6 @@ class API extends PluginAPI
      * Returns AI provider settings for the administration UI.
      *
      * @return array<string, mixed> Provider metadata and masked configuration values.
-     * @throws Exception
      */
     public function getSettings(): array
     {
@@ -81,7 +79,6 @@ class API extends PluginAPI
      * @param string $providerConfigurations JSON object keyed by provider ID
      *                                      with connection settings.
      * @return array<string, mixed> Updated provider metadata and masked configuration values.
-     * @throws Exception
      */
     public function saveSettings(
         string $defaultProviderId = '',
@@ -112,7 +109,6 @@ class API extends PluginAPI
      * @return array{providerId: string, providerName: string, models: list<string>}
      *         Tested provider's metadata and the models it can serve (empty for
      *         providers that do not expose a model listing).
-     * @throws Exception when the connection cannot be established.
      */
     public function testConnection(
         string $providerId,
@@ -142,7 +138,6 @@ class API extends PluginAPI
      *
      * @param string $providerId Provider ID to disconnect.
      * @return array<string, mixed> Updated provider metadata and masked configuration values.
-     * @throws Exception
      */
     public function disconnectProvider(string $providerId): array
     {

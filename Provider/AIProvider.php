@@ -176,7 +176,6 @@ abstract class AIProvider
      * generation tokens. Returns normally when the connection works.
      *
      * @param array<string, string> $configuration
-     * @throws AIProviderException when the connection cannot be established
      */
     public function verifyConnection(array $configuration): void
     {

@@ -30,9 +30,6 @@ class Controller extends ControllerAdmin
         $this->configuration = $configuration;
     }
 
-    /**
-     * @throws Exception
-     */
     public function index(): string
     {
         Piwik::checkUserHasSuperUserAccess();

@@ -95,7 +95,7 @@ class Anthropic extends AIProvider
         return $this->buildResponse(
             $request,
             $model,
-            is_string($text) ? $text : '',
+            $text,
             isset($response['usage']['input_tokens']) ? (int) $response['usage']['input_tokens'] : null,
             isset($response['usage']['output_tokens']) ? (int) $response['usage']['output_tokens'] : null,
             $stopReason
@@ -123,9 +123,7 @@ class Anthropic extends AIProvider
             }
         }
 
-        $fallback = $content[0]['text'] ?? '';
-
-        return is_string($fallback) ? $fallback : '';
+        return '';
     }
 
     /**
