@@ -92,15 +92,6 @@ class CapabilityThinkingTest extends TestCase
         $this->assertSame('visible answer', $response->getText());
     }
 
-    public function testClaudeCompletionStillAcceptsLegacyTextBlockShape(): void
-    {
-        $claude = new RecordingCompleteAnthropic();
-
-        $response = $claude->complete($this->instantRequest(), self::CLAUDE_CONFIG);
-
-        $this->assertSame('ok', $response->getText());
-    }
-
     public function testGeminiInstantDisablesThinkingBudget(): void
     {
         $gemini = new RecordingCompleteGoogle();
@@ -174,7 +165,7 @@ class RecordingCompleteAnthropic extends Anthropic
     public $sentPayload = [];
 
     /** @var array<string, mixed> */
-    public $mockResponse = ['content' => [['text' => 'ok']], 'stop_reason' => 'end_turn'];
+    public $mockResponse = ['content' => [['type' => 'text', 'text' => 'ok']], 'stop_reason' => 'end_turn'];
 
     protected function sendJsonRequest(string $url, array $headers, array $payload, int $timeoutSeconds = 30): array
     {

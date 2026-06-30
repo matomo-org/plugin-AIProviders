@@ -13,7 +13,6 @@ namespace Piwik\Plugins\AIProviders\tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use Piwik\Plugins\AIProviders\AIConversationRequest;
-use Piwik\Plugins\AIProviders\AIRequest;
 use Piwik\Plugins\AIProviders\Provider\OpenAI;
 
 /**

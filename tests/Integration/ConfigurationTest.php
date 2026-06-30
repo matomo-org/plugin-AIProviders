@@ -990,7 +990,7 @@ class ConfigurationTest extends IntegrationTestCase
             $capturedHeaders = $httpEventParams['headers'];
 
             $response = (string) json_encode([
-                'content' => [['text' => $text]],
+                'content' => [['type' => 'text', 'text' => $text]],
                 'usage' => ['input_tokens' => 15, 'output_tokens' => 9],
             ]);
             $status = 200;
