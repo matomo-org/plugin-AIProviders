@@ -456,7 +456,7 @@ onMounted(loadSettings);
     >
       <button
         :disabled="isSaving || !hasUnsavedChanges"
-        class="btn ai-providers-cancel"
+        class="btn btn-outline"
         type="button"
         @click="cancelChanges()"
       >
@@ -589,27 +589,31 @@ onMounted(loadSettings);
   position: absolute;
   top: 16px;
   right: 16px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ai-providers-text-muted);
+  padding: 5px 14px;
+  // Matomo's @color-orange-brand (#f57c00) as warning accent on a light tint.
+  background: fade(#f57c00, 20%);
+  border-radius: 3px;
+  color: #f57c00;
   font-size: 12px;
-  font-style: italic;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
   visibility: hidden;
   opacity: 0;
-  transition: opacity 150ms ease;
-
-  &::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--ai-providers-accent);
-  }
+  transform: translateY(-4px);
+  transition: opacity 150ms ease, transform 150ms ease;
 
   &.is-visible {
     visibility: visible;
     opacity: 1;
+    transform: translateY(0);
+  }
+
+  // A solid orange block glows on dark backgrounds; tone it down to a
+  // translucent tint with orange text instead.
+  [data-theme-mode="dark"] & {
+    background: fade(#f57c00, 18%);
+    color: #f5a557;
   }
 }
 
@@ -620,27 +624,12 @@ onMounted(loadSettings);
   align-items: center;
   gap: 12px;
   margin-top: 24px;
-}
 
-.ai-providers-cancel {
-  background: transparent;
-  color: var(--theme-color-text);
-  border: 1px solid var(--ai-providers-border-strong);
-  box-shadow: none;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-
-  &:hover,
-  &:focus {
-    background: var(--theme-color-background-tinyContrast);
-    border-color: var(--theme-color-text-light);
-    color: var(--theme-color-text);
-  }
-
-  &:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-    background: transparent;
-    border-color: var(--ai-providers-border);
+  // The core .btn[disabled] rule swaps background and text color but leaves
+  // the btn-outline brand-green border in place. Keep the border transparent
+  // (rather than removing it) so the button doesn't shrink by 1px.
+  .btn-outline[disabled] {
+    border-color: transparent;
   }
 }
 </style>

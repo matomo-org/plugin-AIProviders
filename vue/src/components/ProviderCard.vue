@@ -166,7 +166,7 @@ function selectProvider() {
 
         <div class="ai-providers-card-actions">
           <button
-            class="btn btn-small"
+            class="btn btn-outline btn-small"
             type="button"
             :disabled="isTesting || !canTest"
             @click.prevent.stop="emit('test')"
