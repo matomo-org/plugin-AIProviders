@@ -29,7 +29,7 @@
         "RefreshModels": "Refresh models",
         "RequestFailed": "AI provider request failed: %s",
         "SettingsSaveSuccess": "AI provider settings saved.",
-        "StatusConnected": "Connected",
+        "StatusConnected": "API key saved",
         "StatusNotConnected": "Not connected",
         "TestConnection": "Test connection",
         "TestConnectionSuccess": "%1$s connection works.",
@@ -37,6 +37,6 @@
         "ThinkingCapability": "Thinking",
         "ThinkingCapabilityDescription": "Better reasoning for complex tasks.",
         "UnexpectedError": "Unexpected error. Please check the Matomo server logs.",
-        "UnsavedChanges": "You have unsaved changes."
+        "UnsavedChanges": "You have unsaved changes"
     }
 }
