@@ -16,6 +16,9 @@ export interface Provider {
   name: string;
   description: string;
   supportsCustomEndpoint: boolean;
+  defaultEndpointUrl: string;
+  endpointFieldTitle: string;
+  endpointFieldPlaceholder: string;
   defaultModel: string;
   configuration: {
     hasApiKey: boolean;

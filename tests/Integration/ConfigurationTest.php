@@ -70,11 +70,15 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertSame(Configuration::CAPABILITY_INSTANT, $settings['defaultCapabilityLevel']);
         $this->assertTrue($settings['canEditProviderConfiguration']);
         $this->assertTrue($settings['canEditCapabilityLevel']);
-        $this->assertCount(4, $settings['providers']);
+        $this->assertCount(5, $settings['providers']);
 
         $customProvider = $this->getProvider($settings, 'custom-provider');
         $this->assertSame('Custom Provider', $customProvider['name']);
         $this->assertTrue($customProvider['supportsCustomEndpoint']);
+
+        $bedrock = $this->getProvider($settings, 'bedrock');
+        $this->assertSame('AWS Bedrock', $bedrock['name']);
+        $this->assertTrue($bedrock['supportsCustomEndpoint']);
     }
 
     public function testSaveSettingsCanBeCalledWithDefaultsBeforeAnyProviderIsConnected(): void
@@ -583,6 +587,38 @@ class ConfigurationTest extends IntegrationTestCase
 
         $this->assertSame(['openai'], $settingsProviderIds);
         $this->assertSame(['openai'], $statusProviderIds);
+    }
+
+    public function testSavingBedrockWithBareRegionStoresTheExpandedEndpointUrl(): void
+    {
+        // The Bedrock endpoint field accepts a bare AWS region; the value is
+        // normalized to the full runtime URL before validation, so it must
+        // pass the endpoint URL check and be stored in canonical form.
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'bedrock' => ['apiKey' => 'bedrock-long-term-key', 'endpointUrl' => 'eu-central-1'],
+            ])
+        );
+
+        $stored = StaticContainer::get(Configuration::class)->getProviderConfiguration('bedrock');
+
+        $this->assertSame('https://bedrock-runtime.eu-central-1.amazonaws.com', $stored['endpointUrl']);
+    }
+
+    public function testSavingBedrockWithAnUnrecognizedEndpointValueStillFails(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid endpoint URL for AI provider "bedrock".');
+
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'bedrock' => ['apiKey' => 'bedrock-long-term-key', 'endpointUrl' => 'not a url'],
+            ])
+        );
     }
 
     public function testRestrictedProviderCannotBeTested(): void

@@ -37,6 +37,7 @@ class AIProviders extends Plugin
         $providers->addProvider(new Provider\Anthropic());
         $providers->addProvider(new Provider\Google());
         $providers->addProvider(new Provider\OpenAI());
+        $providers->addProvider(new Provider\Bedrock());
         $providers->addProvider(new Provider\CustomProvider());
     }
 
@@ -76,7 +77,10 @@ class AIProviders extends Plugin
          * A managed environment that wants providers hidden from users but
          * still available to allowlisted plugins should demote them with
          * `$providers->setSelectable($id, false)` instead of removing them
-         * (see {@link AIProvidersList}).
+         * (see {@link AIProvidersList}). To replace a built-in provider's
+         * implementation under the same ID (registration is first-wins, so
+         * shadowing it in `addAIProviders` is not possible), remove it here
+         * and register the replacement.
          *
          * @param AIProvidersList $providers Provider registry to mutate.
          */
@@ -91,6 +95,9 @@ class AIProviders extends Plugin
         $translations[] = 'AIProviders_ApiKey';
         $translations[] = 'AIProviders_ApiKeyAlreadyConfiguredPlaceholder';
         $translations[] = 'AIProviders_ApiKeyPlaceholder';
+        $translations[] = 'AIProviders_BedrockDescription';
+        $translations[] = 'AIProviders_BedrockEndpointPlaceholder';
+        $translations[] = 'AIProviders_BedrockEndpointTitle';
         $translations[] = 'AIProviders_ClickTestConnectionToShowAvailableModels';
         $translations[] = 'AIProviders_ConfigurationIntro';
         $translations[] = 'AIProviders_CustomProviderDescription';

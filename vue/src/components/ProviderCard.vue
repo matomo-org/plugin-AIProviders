@@ -35,12 +35,16 @@ const emit = defineEmits<{
 
 const hasPendingKey = computed(() => (props.configuration?.apiKey ?? '') !== '');
 const hasEndpointUrl = computed(() => (props.configuration?.endpointUrl ?? '') !== '');
+const hasKey = computed(() => hasPendingKey.value || props.provider.configuration.hasApiKey);
 
-// Custom endpoints may run without a key, so reaching the server only needs the
-// URL; fixed hosted providers need a key (pending or already stored).
-const canTest = computed(() => (props.provider.supportsCustomEndpoint
-  ? hasEndpointUrl.value
-  : hasPendingKey.value || props.provider.configuration.hasApiKey));
+// Providers with a default endpoint (e.g. AWS Bedrock) only need the key;
+// fully custom servers need the URL and commonly run without authentication.
+const canTest = computed(() => {
+  if (!props.provider.supportsCustomEndpoint || props.provider.defaultEndpointUrl) {
+    return hasKey.value;
+  }
+  return hasEndpointUrl.value;
+});
 
 const modelOptions = computed(() => {
   const options: Record<string, string> = {};
@@ -90,8 +94,8 @@ function selectProvider() {
           class="ai-providers-endpoint-field"
           :model-value="configuration?.endpointUrl"
           :name="`endpointUrl-${provider.id}`"
-          :title="translate('AIProviders_EndpointUrl')"
-          :placeholder="translate('AIProviders_EndpointUrlPlaceholder')"
+          :title="translate(provider.endpointFieldTitle)"
+          :placeholder="translate(provider.endpointFieldPlaceholder)"
           autocomplete="off"
           full-width
           uicontrol="text"

@@ -556,6 +556,9 @@ class Configuration
             return '';
         }
 
+        // Expand provider shorthand (e.g. a bare AWS region) before validating.
+        $endpointUrl = $provider->normalizeEndpointUrl($endpointUrl);
+
         $parsedUrl = parse_url($endpointUrl);
         $scheme = is_array($parsedUrl) ? ($parsedUrl['scheme'] ?? '') : '';
 
