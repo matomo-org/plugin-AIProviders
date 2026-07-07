@@ -24,7 +24,7 @@
         "GoogleDefaultModelDescription": "Default model: gemini-2.5-flash-lite",
         "InstantCapability": "Instant",
         "InstantCapabilityDescription": "Fast and cost-effective for simple tasks.",
-        "ManagedConfigurationHelp": "AI provider settings are managed by Matomo Cloud and cannot be changed on this instance.",
+        "ManagedConfigurationHelp": "AI provider settings are managed for this instance and cannot be changed here.",
         "MenuTitle": "AI Providers",
         "Model": "Model",
         "NoDefaultProviderWarning": "No AI provider can be set as the default yet. Connect a provider first.",

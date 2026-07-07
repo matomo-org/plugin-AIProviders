@@ -58,6 +58,9 @@ class ConfigurationTest extends IntegrationTestCase
     {
         Config::getInstance()->AIProviders = [];
         putenv('MATOMO_AIPROVIDERS_OPENAI_API_KEY');
+        StaticContainer::getContainer()->set('AIProviders.openaiApiKey', '');
+        StaticContainer::getContainer()->set('AIProviders.openaiEndpointUrl', '');
+        StaticContainer::getContainer()->set('AIProviders.openaiModel', '');
 
         parent::tearDown();
     }
@@ -542,6 +545,26 @@ class ConfigurationTest extends IntegrationTestCase
         Config::getInstance()->AIProviders = ['openaiApiKey' => 'config-openai-key'];
 
         $this->assertSame('config-openai-key', $configuration->getProviderConfiguration('openai')['apiKey']);
+    }
+
+    public function testDiValueSuppliesApiKey(): void
+    {
+        StaticContainer::getContainer()->set('AIProviders.openaiApiKey', 'di-openai-key');
+
+        $configuration = StaticContainer::get(Configuration::class);
+
+        $this->assertSame('di-openai-key', $configuration->getProviderConfiguration('openai')['apiKey']);
+    }
+
+    public function testDiValueWinsOverConfigFileAndEnvironmentVariable(): void
+    {
+        putenv('MATOMO_AIPROVIDERS_OPENAI_API_KEY=env-openai-key');
+        Config::getInstance()->AIProviders = ['openaiApiKey' => 'config-openai-key'];
+        StaticContainer::getContainer()->set('AIProviders.openaiApiKey', 'di-openai-key');
+
+        $configuration = StaticContainer::get(Configuration::class);
+
+        $this->assertSame('di-openai-key', $configuration->getProviderConfiguration('openai')['apiKey']);
     }
 
     public function testManagedFlowServesAllowlistedPluginThroughRestrictedProviderWithConfigCredentials(): void

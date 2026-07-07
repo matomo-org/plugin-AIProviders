@@ -5,7 +5,7 @@
 
 Configure AI provider connections and default model settings used by Matomo AI features.
 
-Built-in providers: Anthropic, OpenAI, Google, and a generic custom provider for OpenAI-compatible endpoints.
+Built-in providers: Anthropic, OpenAI, Google, AWS Bedrock, and a generic custom provider for OpenAI-compatible endpoints.
 
 ## Configuration
 
@@ -31,9 +31,13 @@ Two things matter when configuring it:
 
 - **Model.** The "test connection" action probes `GET {base}/models` and populates the model picker from the result. Pick the model to use. The custom provider has **no built-in default model**.
 
-### Config-file credentials
+### Managed credentials
 
-Provider connection settings can also be supplied from the `[AIProviders]` config section or environment variables instead of the administration UI. Per field, a config-file/environment value wins over the database value:
+Provider connection settings can also be supplied through namespaced DI values, the `[AIProviders]` config section, or environment variables instead of the administration UI. Per field, managed values win over the database value:
+
+```php
+AIProviders.openaiApiKey
+```
 
 ```ini
 [AIProviders]

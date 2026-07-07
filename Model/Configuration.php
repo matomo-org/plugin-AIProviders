@@ -13,6 +13,7 @@ namespace Piwik\Plugins\AIProviders\Model;
 
 use InvalidArgumentException;
 use Piwik\Config;
+use Piwik\Container\StaticContainer;
 use Piwik\Settings\FieldConfig;
 use Piwik\Settings\Plugin\SystemSetting;
 use Piwik\Plugins\AIProviders\AIProvidersList;
@@ -21,28 +22,21 @@ use Piwik\Plugins\AIProviders\Provider\AIProvider;
 /**
  * Stores and resolves the AI provider configuration.
  *
- * Provider connection settings come from two sources, merged per field with
- * the config file winning:
+ * Provider connection settings are merged per field in this order:
  *
- * 1. The database, written from the administration UI ("provider credentials"
- *    system setting).
- * 2. The `[AIProviders]` section of `config.ini.php`, or environment
- *    variables, keyed per provider:
+ * 1. Namespaced DI values supplied by the instance owner:
+ *
+ *        AIProviders.openaiApiKey
+ *
+ * 2. The `[AIProviders]` section of `config.ini.php`, or environment variables:
  *
  *        [AIProviders]
  *        openaiApiKey = "..."       ; or env MATOMO_AIPROVIDERS_OPENAI_API_KEY
  *        openaiEndpointUrl = "..."  ; or env MATOMO_AIPROVIDERS_OPENAI_ENDPOINT_URL
  *
- *    The config key is `<providerId>` verbatim plus the field suffix; the
- *    environment variable upper-cases the ID and replaces `-` with `_`
- *    (for example `MATOMO_AIPROVIDERS_CUSTOM_PROVIDER_API_KEY`).
+ * 3. The database, written from the administration UI.
  *
- * The config-file source is how a managed environment supplies
- * credentials for providers its own plugins are allowed to target (see
- * `providerSelectionAllowlist` below) without the credentials ever being
- * stored in the database or shown in the UI. On a self-hosted instance both
- * sources belong to the instance owner; config-file credentials simply cannot
- * be edited or removed from the UI.
+ * The DI/config-file sources are how a managed environment supplies credentials.
  */
 class Configuration
 {
@@ -180,18 +174,11 @@ class Configuration
     }
 
     /**
-     * Returns the effective server-side provider configuration including the
-     * API key: per field, a value from the config file or environment wins
-     * over the database value (see the class docblock for the sources).
-     *
-     * The config file always winning keeps the rule identical on managed and
-     * self-hosted instances. It is still safe in a managed environment because
-     * the UI that writes database credentials is locked there from the start,
-     * so no database value can exist to begin with.
+     * Returns the effective server-side provider configuration including the API key.
      *
      * The returned array contains secrets. It is internal to the AIProviders
      * plugin and its providers and must never be returned from API methods,
-     * logged, or exposed to other plugins; other plugins run completions via
+     * logged, or exposed to other plugins. Other plugins run completions via
      * {@link \Piwik\Plugins\AIProviders\AIProviderService::complete()} and
      * never see credentials.
      *
@@ -664,9 +651,6 @@ class Configuration
     }
 
     /**
-     * Returns the provider connection settings supplied via the config file or
-     * environment variables (see the class docblock for the exact keys).
-     *
      * @return array{apiKey: string, endpointUrl: string, model: string}
      */
     private function getConfigFileProviderConfiguration(string $providerId): array
@@ -678,13 +662,13 @@ class Configuration
         ];
     }
 
-    /**
-     * Reads one provider connection field from the `[AIProviders]` config
-     * section (key `<providerId><configSuffix>`), falling back to the
-     * environment variable `MATOMO_AIPROVIDERS_<PROVIDER_ID>_<ENV_SUFFIX>`.
-     */
     private function getConfigFileValue(string $providerId, string $configSuffix, string $envSuffix): string
     {
+        $diValue = $this->getDiConfigValue($providerId, $configSuffix);
+        if ($diValue !== '') {
+            return $diValue;
+        }
+
         $config = Config::getInstance()->AIProviders;
         $configKey = $providerId . $configSuffix;
 
@@ -700,5 +684,19 @@ class Configuration
         }
 
         return '';
+    }
+
+    private function getDiConfigValue(string $providerId, string $configSuffix): string
+    {
+        $diKey = self::PLUGIN_NAME . '.' . $providerId . $configSuffix;
+        $container = StaticContainer::getContainer();
+
+        if (!$container->has($diKey)) {
+            return '';
+        }
+
+        $value = $container->get($diKey);
+
+        return is_string($value) && trim($value) !== '' ? trim($value) : '';
     }
 }

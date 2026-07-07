@@ -29,11 +29,6 @@ use Piwik\Plugins\AIProviders\CanonicalMessage;
  * endpoint targets us-east-1 and users in another region change the hostname
  * (`https://bedrock-runtime.<region>.amazonaws.com`).
  *
- * A managed environment can replace this provider with a subclass that
- * overrides {@link sendConverseRequest()} to route the same Converse payloads
- * through a different transport, such as the AWS SDK with IAM-role
- * credentials.
- *
  * @see https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html
  * @phpstan-import-type CanonicalMessageArray from CanonicalMessage
  * @phpstan-import-type CanonicalContentBlockArray from CanonicalMessage
@@ -259,7 +254,6 @@ class Bedrock extends AIProvider
 
     /**
      * Resolves the model: per-request, then saved configuration, then default.
-     * A managed subclass overrides this to pin the model (cost control).
      *
      * @param array<string, string> $configuration
      */
@@ -275,9 +269,8 @@ class Bedrock extends AIProvider
     }
 
     /**
-     * The transport seam: POSTs the Converse payload to the regional runtime
-     * endpoint with bearer-key auth. A managed subclass replaces it wholesale
-     * (e.g. AWS SDK with IAM-role credentials).
+     * POSTs the Converse payload to the regional runtime endpoint with
+     * bearer-key auth.
      *
      * @param array<string, mixed> $payload Converse request body, without the model
      * @param array<string, string> $configuration
