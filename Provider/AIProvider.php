@@ -1060,7 +1060,7 @@ abstract class AIProvider
                 continue;
             }
 
-            $errorSuffix = $providerError !== '' ? ': ' . substr($providerError, 0, 300) : '';
+            $errorSuffix = $providerError !== '' ? ': ' . mb_strimwidth($providerError, 0, 300, '…', 'UTF-8') : '';
             $message = sprintf('%s request failed%s.', $this->getName(), $errorSuffix);
 
             if ($status >= 500) {
