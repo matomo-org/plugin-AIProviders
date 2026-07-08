@@ -1023,9 +1023,8 @@ abstract class AIProvider
                 $this->logProviderTransportDebugMetadata($method, $url, $timeoutSeconds, $attempt + 1, $e);
 
                 throw new AIProviderException(sprintf(
-                    'Could not connect to %s: %s',
-                    $this->getName(),
-                    $e->getMessage()
+                    'Could not connect to %s.',
+                    $this->getName()
                 ), 0, $e);
             }
 
