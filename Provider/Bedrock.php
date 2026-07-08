@@ -16,6 +16,7 @@ use Piwik\Plugins\AIProviders\AIConversationResponse;
 use Piwik\Plugins\AIProviders\AIProviderResponse;
 use Piwik\Plugins\AIProviders\AIRequest;
 use Piwik\Plugins\AIProviders\CanonicalMessage;
+use Piwik\Plugins\AIProviders\Exception\AIProviderClientException;
 
 /**
  * AWS Bedrock provider using the Converse HTTP API.
@@ -25,9 +26,8 @@ use Piwik\Plugins\AIProviders\CanonicalMessage;
  * (short-term keys expire within 12 hours and cannot serve a stored
  * configuration).
  *
- * The AWS region lives in the endpoint URL and nowhere else: the default
- * endpoint targets us-east-1 and users in another region change the hostname
- * (`https://bedrock-runtime.<region>.amazonaws.com`).
+ * The AWS region is configured directly; runtime and control-plane endpoints
+ * are derived internally so Matomo never sends the key to arbitrary hosts.
  *
  * @see https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html
  * @phpstan-import-type CanonicalMessageArray from CanonicalMessage
@@ -38,7 +38,7 @@ class Bedrock extends AIProvider
 {
     public const ID = 'bedrock';
 
-    private const DEFAULT_ENDPOINT_URL = 'https://bedrock-runtime.us-east-1.amazonaws.com';
+    private const DEFAULT_REGION = 'us-east-1';
     private const DEFAULT_MODEL = 'openai.gpt-oss-120b-1:0';
 
     /** Timeout for single-shot completions; conversations use the request's own budget. */
@@ -56,7 +56,7 @@ class Bedrock extends AIProvider
 
     public function getDefaultEndpointUrl(): string
     {
-        return self::DEFAULT_ENDPOINT_URL;
+        return self::DEFAULT_REGION;
     }
 
     public function getEndpointFieldTitle(): string
@@ -67,6 +67,16 @@ class Bedrock extends AIProvider
     public function getEndpointFieldPlaceholder(): string
     {
         return 'AIProviders_BedrockEndpointPlaceholder';
+    }
+
+    public function supportsFipsEndpoint(): bool
+    {
+        return true;
+    }
+
+    public function endpointFieldRequiresUrl(): bool
+    {
+        return false;
     }
 
     public function getDefaultModel(): string
@@ -92,7 +102,7 @@ class Bedrock extends AIProvider
      */
     protected function isTrustedRequestHost(string $host): bool
     {
-        return preg_match('/^bedrock(-runtime)?(-fips)?\.[a-z0-9-]+\.amazonaws\.com$/i', $host) === 1;
+        return preg_match('/^bedrock(-runtime)?(-fips)?\.[a-z]{2}(?:-[a-z0-9]+)+-[0-9]+\.amazonaws\.com$/i', $host) === 1;
     }
 
     /**
@@ -208,7 +218,7 @@ class Bedrock extends AIProvider
     public function listModels(array $configuration): array
     {
         $response = $this->sendGetRequest(
-            $this->getModelListingEndpoint($this->getEndpointUrl($configuration)),
+            $this->getModelListingEndpoint($this->getRegion($configuration), $configuration),
             $this->getAuthorizationHeader($configuration)
         );
 
@@ -225,31 +235,74 @@ class Bedrock extends AIProvider
     }
 
     /**
-     * Expands a bare AWS region (e.g. `eu-central-1`) into the regional
-     * runtime URL; full URLs and unrecognized values pass through untouched.
+     * Normalizes the AWS region. Bedrock endpoints are derived internally so
+     * user/config input never decides the request host directly.
      */
     public function normalizeEndpointUrl(string $endpointUrl): string
     {
-        $value = strtolower(trim($endpointUrl));
+        return $this->normalizeRegion($endpointUrl);
+    }
 
-        if (preg_match('/^[a-z]{2}(?:-[a-z0-9]+)+$/', $value)) {
-            return 'https://bedrock-runtime.' . $value . '.amazonaws.com';
+    public function normalizeRegion(string $region): string
+    {
+        $region = strtolower(trim($region));
+
+        if ($region === '') {
+            return self::DEFAULT_REGION;
         }
 
-        return $endpointUrl;
+        if (preg_match('/^[a-z]{2}(?:-[a-z0-9]+)+-[0-9]+$/', $region) !== 1) {
+            throw new AIProviderClientException(sprintf('The AWS region for %s is invalid.', $this->getName()));
+        }
+
+        return $region;
     }
 
     /**
-     * Applies the region shorthand on use as well: config-file credentials
+     * Applies region normalization on use as well: config-file credentials
      * bypass the admin-side normalization.
      *
-     * @param array<string, string> $configuration
+     * @param array<string, mixed> $configuration
      */
     protected function getEndpointUrl(array $configuration): string
     {
-        $configuration['endpointUrl'] = $this->normalizeEndpointUrl($configuration['endpointUrl'] ?? '');
+        return $this->getRuntimeEndpoint($this->getRegion($configuration), $configuration);
+    }
 
-        return parent::getEndpointUrl($configuration);
+    /**
+     * @param array<string, mixed> $configuration
+     */
+    private function getRegion(array $configuration): string
+    {
+        return $this->normalizeRegion((string) ($configuration['endpointUrl'] ?? ''));
+    }
+
+    /**
+     * @param array<string, mixed> $configuration
+     */
+    private function getRuntimeEndpoint(string $region, array $configuration): string
+    {
+        $service = $this->useFipsEndpoint($configuration) ? 'bedrock-runtime-fips' : 'bedrock-runtime';
+
+        return sprintf('https://%s.%s.amazonaws.com', $service, $region);
+    }
+
+    /**
+     * @param array<string, mixed> $configuration
+     */
+    private function getControlPlaneEndpoint(string $region, array $configuration): string
+    {
+        $service = $this->useFipsEndpoint($configuration) ? 'bedrock-fips' : 'bedrock';
+
+        return sprintf('https://%s.%s.amazonaws.com', $service, $region);
+    }
+
+    /**
+     * @param array<string, mixed> $configuration
+     */
+    private function useFipsEndpoint(array $configuration): bool
+    {
+        return !empty($configuration['useFipsEndpoint']);
     }
 
     /**
@@ -296,15 +349,12 @@ class Bedrock extends AIProvider
         return rtrim($endpointUrl, '/') . '/model/' . rawurlencode($model) . '/converse';
     }
 
-    private function getModelListingEndpoint(string $endpointUrl): string
+    /**
+     * @param array<string, mixed> $configuration
+     */
+    private function getModelListingEndpoint(string $region, array $configuration): string
     {
-        $controlPlaneUrl = (string) preg_replace(
-            '#^(https://)bedrock-runtime\.#',
-            '$1bedrock.',
-            rtrim($endpointUrl, '/')
-        );
-
-        return $controlPlaneUrl . '/foundation-models?byInferenceType=ON_DEMAND';
+        return $this->getControlPlaneEndpoint($region, $configuration) . '/foundation-models?byInferenceType=ON_DEMAND';
     }
 
     /**

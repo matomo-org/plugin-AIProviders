@@ -27,6 +27,7 @@ const emit = defineEmits<{
   (e: 'select'): void;
   (e: 'update:apiKey', value: string): void;
   (e: 'update:endpointUrl', value: string): void;
+  (e: 'update:useFipsEndpoint', value: boolean): void;
   (e: 'update:model', value: string): void;
   (e: 'test'): void;
   (e: 'disconnect'): void;
@@ -100,6 +101,17 @@ function selectProvider() {
           full-width
           uicontrol="text"
           @update:model-value="emit('update:endpointUrl', `${$event}`)"
+        />
+
+        <Field
+          v-if="provider.supportsFipsEndpoint"
+          class="ai-providers-fips-field"
+          :model-value="configuration?.useFipsEndpoint"
+          :name="`useFipsEndpoint-${provider.id}`"
+          :title="translate('AIProviders_BedrockUseFipsEndpoint')"
+          full-width
+          uicontrol="checkbox"
+          @update:model-value="emit('update:useFipsEndpoint', !!$event)"
         />
 
         <Field
@@ -265,8 +277,26 @@ function selectProvider() {
     box-sizing: border-box;
   }
 
-  .matomo-form-field.ai-providers-endpoint-field {
+  .matomo-form-field.ai-providers-endpoint-field,
+  .matomo-form-field.ai-providers-fips-field {
     margin-bottom: 16px;
+  }
+
+  // Text fields need the extra headroom above them for their floating label;
+  // the checkbox has none, so collapse the preceding field's spacing to keep
+  // the card's 16px rhythm.
+  .matomo-form-field.ai-providers-fips-field {
+    margin-top: -16px;
+
+    .checkbox label {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .checkbox [type="checkbox"] + span {
+      height: auto;
+      line-height: 1.5;
+    }
   }
 }
 

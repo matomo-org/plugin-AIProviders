@@ -86,6 +86,7 @@ function applySettings(nextSettings: Settings) {
       apiKey: '',
       endpointUrl: provider.configuration.endpointUrl || '',
       model: savedModel,
+      useFipsEndpoint: provider.configuration.useFipsEndpoint || false,
     };
   });
   providerConfigurations.value = nextProviderConfigurations;
@@ -244,6 +245,14 @@ function updateEndpointUrl(providerId: string, endpointUrl: string) {
   availableModels.value[providerId] = [];
 }
 
+function updateUseFipsEndpoint(providerId: string, useFipsEndpoint: boolean) {
+  providerConfigurations.value[providerId] = {
+    ...providerConfigurations.value[providerId],
+    useFipsEndpoint,
+  };
+  availableModels.value[providerId] = [];
+}
+
 async function disconnectProvider(providerId: string) {
   disconnectingProviders.value[providerId] = true;
 
@@ -394,6 +403,7 @@ onMounted(loadSettings);
               @update:api-key="updateApiKey(provider.id, $event)"
               @update:endpoint-url="updateEndpointUrl(provider.id, $event)"
               @update:model="updateModel(provider.id, $event)"
+              @update:use-fips-endpoint="updateUseFipsEndpoint(provider.id, $event)"
             />
           </div>
 

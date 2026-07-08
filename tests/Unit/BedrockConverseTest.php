@@ -498,13 +498,13 @@ class BedrockConverseTest extends TestCase
         $this->assertArrayHasKey('messages', $bedrock->sentPayload);
     }
 
-    public function testHttpTransportHonoursCustomEndpointForOtherRegions(): void
+    public function testHttpTransportHonoursConfiguredRegion(): void
     {
         $bedrock = new HttpRecordingBedrock();
 
         $bedrock->converse($this->simpleRequest(), [
             'apiKey' => 'bedrock-api-key',
-            'endpointUrl' => 'https://bedrock-runtime.eu-central-1.amazonaws.com/',
+            'endpointUrl' => 'eu-central-1',
             'model' => '',
         ]);
 
@@ -517,7 +517,7 @@ class BedrockConverseTest extends TestCase
     /**
      * @dataProvider getRegionShorthandData
      */
-    public function testBareRegionAsEndpointExpandsToTheRegionalEndpoint(string $endpointValue, string $expectedHost): void
+    public function testConfiguredRegionExpandsToTheRegionalEndpoint(string $endpointValue, string $expectedHost): void
     {
         $bedrock = new HttpRecordingBedrock();
 
@@ -544,6 +544,25 @@ class BedrockConverseTest extends TestCase
             'whitespace and case are tolerated' => [' US-East-1 ', 'bedrock-runtime.us-east-1.amazonaws.com'],
             'empty value falls back to the default endpoint' => ['', 'bedrock-runtime.us-east-1.amazonaws.com'],
         ];
+    }
+
+    public function testFullUrlEndpointIsRejectedBeforeTheBearerTokenCanBeSent(): void
+    {
+        $bedrock = new HttpRecordingBedrock();
+
+        try {
+            $bedrock->converse($this->simpleRequest(), [
+                'apiKey' => 'bedrock-api-key',
+                'endpointUrl' => 'https://example.com',
+                'model' => '',
+            ]);
+            $this->fail('Expected the invalid Bedrock region to be rejected.');
+        } catch (AIProviderClientException $e) {
+            $this->assertSame('The AWS region for AWS Bedrock is invalid.', $e->getMessage());
+        }
+
+        $this->assertNull($bedrock->sentUrl);
+        $this->assertSame([], $bedrock->sentHeaders);
     }
 
     public function testRegionShorthandAlsoDrivesTheModelListingHost(): void
@@ -600,7 +619,7 @@ class BedrockConverseTest extends TestCase
 
         $models = $bedrock->listModels([
             'apiKey' => 'bedrock-api-key',
-            'endpointUrl' => 'https://bedrock-runtime.eu-central-1.amazonaws.com',
+            'endpointUrl' => 'eu-central-1',
             'model' => '',
         ]);
 
@@ -613,6 +632,31 @@ class BedrockConverseTest extends TestCase
         );
         $this->assertSame(['Authorization' => 'Bearer bedrock-api-key'], $bedrock->sentGetHeaders);
         $this->assertSame(['amazon.nova-lite-v1:0', 'openai.gpt-oss-120b-1:0'], $models);
+    }
+
+    public function testFipsEndpointSwitchUsesFipsRuntimeAndControlPlaneHosts(): void
+    {
+        $bedrock = new HttpRecordingBedrock();
+        $configuration = [
+            'apiKey' => 'bedrock-api-key',
+            'endpointUrl' => 'us-east-1',
+            'model' => '',
+            'useFipsEndpoint' => true,
+        ];
+
+        $bedrock->converse($this->simpleRequest(), $configuration);
+
+        $this->assertSame(
+            'https://bedrock-runtime-fips.us-east-1.amazonaws.com/model/openai.gpt-oss-120b-1%3A0/converse',
+            $bedrock->sentUrl
+        );
+
+        $bedrock->listModels($configuration);
+
+        $this->assertSame(
+            'https://bedrock-fips.us-east-1.amazonaws.com/foundation-models?byInferenceType=ON_DEMAND',
+            $bedrock->sentGetUrl
+        );
     }
 
     /**
@@ -639,6 +683,7 @@ class BedrockConverseTest extends TestCase
             'runtime host' => ['bedrock-runtime.eu-central-1.amazonaws.com', true],
             'control-plane host' => ['bedrock.eu-central-1.amazonaws.com', true],
             'FIPS runtime host' => ['bedrock-runtime-fips.us-east-1.amazonaws.com', true],
+            'FIPS control-plane host' => ['bedrock-fips.us-east-1.amazonaws.com', true],
             'other AWS service stays blocked' => ['s3.eu-central-1.amazonaws.com', false],
             'metadata-style host stays blocked' => ['ec2.internal.amazonaws.com', false],
             'lookalike domain stays blocked' => ['bedrock-runtime.eu-central-1.amazonaws.com.evil.example', false],

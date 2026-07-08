@@ -612,28 +612,47 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertSame(['openai'], $statusProviderIds);
     }
 
-    public function testSavingBedrockWithBareRegionStoresTheExpandedEndpointUrl(): void
+    public function testSavingBedrockWithRegionStoresTheNormalizedRegionAndFipsSetting(): void
     {
-        // The Bedrock endpoint field accepts a bare AWS region; the value is
-        // normalized to the full runtime URL before validation, so it must
-        // pass the endpoint URL check and be stored in canonical form.
         $this->api->saveSettings(
             '',
             '',
             (string) json_encode([
-                'bedrock' => ['apiKey' => 'bedrock-long-term-key', 'endpointUrl' => 'eu-central-1'],
+                'bedrock' => [
+                    'apiKey' => 'bedrock-long-term-key',
+                    'endpointUrl' => ' EU-Central-1 ',
+                    'useFipsEndpoint' => true,
+                ],
             ])
         );
 
         $stored = StaticContainer::get(Configuration::class)->getProviderConfiguration('bedrock');
 
-        $this->assertSame('https://bedrock-runtime.eu-central-1.amazonaws.com', $stored['endpointUrl']);
+        $this->assertSame('eu-central-1', $stored['endpointUrl']);
+        $this->assertTrue($stored['useFipsEndpoint']);
     }
 
-    public function testSavingBedrockWithAnUnrecognizedEndpointValueStillFails(): void
+    public function testSavingBedrockWithOnlyTheFipsSettingIsPersisted(): void
+    {
+        // Semi-managed setups get the API key from the config file, so the
+        // admin may submit nothing but the FIPS toggle.
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'bedrock' => ['useFipsEndpoint' => true],
+            ])
+        );
+
+        $stored = StaticContainer::get(Configuration::class)->getProviderConfiguration('bedrock');
+
+        $this->assertTrue($stored['useFipsEndpoint']);
+    }
+
+    public function testSavingBedrockWithAnUnrecognizedRegionValueStillFails(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid endpoint URL for AI provider "bedrock".');
+        $this->expectExceptionMessage('The AWS region for AWS Bedrock is invalid.');
 
         $this->api->saveSettings(
             '',

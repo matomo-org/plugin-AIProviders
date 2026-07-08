@@ -109,6 +109,16 @@ abstract class AIProvider
         return $this->supportsCustomEndpoint;
     }
 
+    public function supportsFipsEndpoint(): bool
+    {
+        return false;
+    }
+
+    public function endpointFieldRequiresUrl(): bool
+    {
+        return true;
+    }
+
     public function getDefaultEndpointUrl(): string
     {
         return '';
@@ -814,6 +824,7 @@ abstract class AIProvider
      *     name: string,
      *     description: string,
      *     supportsCustomEndpoint: bool,
+     *     supportsFipsEndpoint: bool,
      *     defaultEndpointUrl: string,
      *     endpointFieldTitle: string,
      *     endpointFieldPlaceholder: string,
@@ -827,6 +838,7 @@ abstract class AIProvider
             'name' => $this->getName(),
             'description' => $this->getDescription(),
             'supportsCustomEndpoint' => $this->supportsCustomEndpoint(),
+            'supportsFipsEndpoint' => $this->supportsFipsEndpoint(),
             'defaultEndpointUrl' => $this->getDefaultEndpointUrl(),
             'endpointFieldTitle' => $this->getEndpointFieldTitle(),
             'endpointFieldPlaceholder' => $this->getEndpointFieldPlaceholder(),

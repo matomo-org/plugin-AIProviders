@@ -9,6 +9,7 @@ export interface ProviderConfiguration {
   apiKey: string;
   endpointUrl: string;
   model: string;
+  useFipsEndpoint: boolean;
 }
 
 export interface Provider {
@@ -16,6 +17,7 @@ export interface Provider {
   name: string;
   description: string;
   supportsCustomEndpoint: boolean;
+  supportsFipsEndpoint: boolean;
   defaultEndpointUrl: string;
   endpointFieldTitle: string;
   endpointFieldPlaceholder: string;
@@ -24,6 +26,7 @@ export interface Provider {
     hasApiKey: boolean;
     endpointUrl: string;
     model: string;
+    useFipsEndpoint: boolean;
     isUsable: boolean;
   };
 }
