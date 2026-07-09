@@ -22,7 +22,7 @@
         "Disconnecting": "Disconnecting…",
         "EndpointUrl": "API base URL",
         "EndpointUrlPlaceholder": "Enter your base URL",
-        "GoogleDefaultModelDescription": "Default model: gemini-2.5-flash-lite",
+        "GoogleDefaultModelDescription": "Default model: gemini-3.1-flash-lite",
         "InstantCapability": "Instant",
         "InstantCapabilityDescription": "Fast and cost-effective for simple tasks.",
         "ManagedConfigurationHelp": "AI provider settings are managed for this instance and cannot be changed here.",

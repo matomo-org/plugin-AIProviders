@@ -612,6 +612,69 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertSame(['openai'], $statusProviderIds);
     }
 
+    public function testAllowlistedCallerSeesRestrictedProvidersWithTheirConfiguredState(): void
+    {
+        Config::getInstance()->AIProviders = [
+            'defaultProvider' => 'openai',
+            'anthropicApiKey' => 'config-claude-key',
+            'providerSelectionAllowlist' => ['ExamplePlugin'],
+        ];
+        $this->restrictSelectableProvidersTo('openai');
+
+        $statuses = StaticContainer::get(AIProviderService::class)
+            ->getProviderStatusesForCaller('ExamplePlugin');
+        $statusesById = array_column($statuses, null, 'id');
+
+        // The full registered list, matching what complete() can serve.
+        $this->assertGreaterThan(1, count($statusesById));
+        $this->assertArrayHasKey('openai', $statusesById);
+        $this->assertArrayHasKey('anthropic', $statusesById);
+        $this->assertTrue($statusesById['anthropic']['isConfigured']);
+        $this->assertFalse($statusesById['google']['isConfigured']);
+        $this->assertSame(
+            ['id', 'name', 'isConfigured'],
+            array_keys($statusesById['anthropic'])
+        );
+    }
+
+    public function testNonAllowlistedCallerOnlySeesTheForcedProvider(): void
+    {
+        Config::getInstance()->AIProviders = [
+            'defaultProvider' => 'openai',
+            'providerSelectionAllowlist' => ['ExamplePlugin'],
+        ];
+        $this->restrictSelectableProvidersTo('openai');
+
+        $service = StaticContainer::get(AIProviderService::class);
+
+        $this->assertSame(['openai'], array_column($service->getProviderStatusesForCaller('OtherPlugin'), 'id'));
+        $this->assertSame(['openai'], array_column($service->getProviderStatusesForCaller(''), 'id'));
+    }
+
+    public function testUnregisteredForcedProviderYieldsAnEmptyListForLockedCallers(): void
+    {
+        Config::getInstance()->AIProviders = ['defaultProvider' => 'not-a-provider'];
+
+        $statuses = StaticContainer::get(AIProviderService::class)
+            ->getProviderStatusesForCaller('OtherPlugin');
+
+        $this->assertSame([], $statuses);
+    }
+
+    public function testAnyCallerSeesAllProvidersOnAnUnmanagedInstance(): void
+    {
+        // The allowlist is irrelevant when no provider is forced.
+        Config::getInstance()->AIProviders = ['providerSelectionAllowlist' => ['ExamplePlugin']];
+
+        $service = StaticContainer::get(AIProviderService::class);
+
+        foreach (['ExamplePlugin', 'OtherPlugin'] as $caller) {
+            $ids = array_column($service->getProviderStatusesForCaller($caller), 'id');
+            $this->assertContains('anthropic', $ids);
+            $this->assertContains('openai', $ids);
+        }
+    }
+
     public function testSavingBedrockWithRegionStoresTheNormalizedRegionAndFipsSetting(): void
     {
         $this->api->saveSettings(

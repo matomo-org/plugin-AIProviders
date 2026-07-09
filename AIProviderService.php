@@ -199,16 +199,13 @@ class AIProviderService
     }
 
     /**
-     * Resolves which provider a request runs through: the provider forced by
-     * a managed environment, then the caller's requested provider (always on
-     * unmanaged instances; on managed instances only for callers on the
-     * `providerSelectionAllowlist` — the caller name is self-declared, see
-     * {@link Configuration::isPluginAllowedToSelectProvider()} for why this
-     * is a policy gate, not a sandbox), then the configured default.
+     * Resolves which provider a request runs through: the caller's requested
+     * provider (unless {@link isLockedToForcedProvider()}), then the forced
+     * provider, then the configured default.
      *
      * `stripRequestedModel` is true when the forced provider overrode the
-     * request, in which case the caller must also drop the requested model
-     * because the model decides cost on managed instances.
+     * request; the requested model must then be dropped too, because the
+     * model decides cost on managed instances.
      *
      * @return array{providerId: string, stripRequestedModel: bool}
      */
@@ -221,9 +218,9 @@ class AIProviderService
         $hasRequestedProvider = $requestedProviderId !== null && $requestedProviderId !== '';
 
         if (
-            $forcedProviderId !== null
-            && $hasRequestedProvider
-            && $this->configuration->isPluginAllowedToSelectProvider($callerPluginName)
+            $hasRequestedProvider
+            && $forcedProviderId !== null
+            && !$this->isLockedToForcedProvider($forcedProviderId, $callerPluginName)
         ) {
             // TODO: consider validating the requested model against a
             // per-provider `allowedModels` list from the managed config as a
@@ -244,6 +241,17 @@ class AIProviderService
             'providerId' => $this->configuration->getDefaultProviderId($providers),
             'stripRequestedModel' => false,
         ];
+    }
+
+    /**
+     * The managed-mode policy gate shared by {@link resolveProviderId()} and
+     * {@link getProviderStatusesForCaller()}: a caller is locked to the forced
+     * provider unless it is on the `providerSelectionAllowlist`.
+     */
+    private function isLockedToForcedProvider(?string $forcedProviderId, string $callerPluginName): bool
+    {
+        return $forcedProviderId !== null
+            && !$this->configuration->isPluginAllowedToSelectProvider($callerPluginName);
     }
 
     private function requireProvider(AIProvidersList $providers, string $providerId): AIProvider
@@ -324,11 +332,11 @@ class AIProviderService
     }
 
     /**
-     * Returns provider status metadata for trusted PHP callers.
+     * Returns provider status metadata for the administration UI.
      *
      * Restricted providers (registered as non-selectable by a managed
-     * environment) are excluded so they stay invisible outside the
-     * allowlisted completion flow.
+     * environment) are excluded so they stay hidden from admin surfaces;
+     * completion callers use {@link getProviderStatusesForCaller()} instead.
      *
      * @return array<int, array{
      *     id: string,
@@ -361,5 +369,39 @@ class AIProviderService
                 'endpointUrl' => $configuration['endpointUrl'],
             ];
         }, $providers->getSelectableProviders());
+    }
+
+    /**
+     * Returns the providers the given caller can run completions through,
+     * flagged with whether credentials are in place. Follows the provider
+     * resolution of {@link complete()}.
+     *
+     * The caller name is self-declared (same trust model as complete()):
+     * pass a hardcoded plugin name, and gate any HTTP exposure of the result
+     * with the feature's usual access check.
+     *
+     * @return array<int, array{id: string, name: string, isConfigured: bool}>
+     */
+    public function getProviderStatusesForCaller(string $callerPluginName): array
+    {
+        $providers = AIProviders::getAvailableProviders();
+        $forcedProviderId = $this->configuration->getForcedProviderId();
+
+        if ($this->isLockedToForcedProvider($forcedProviderId, $callerPluginName)) {
+            $forced = $providers->getProvider($forcedProviderId);
+            $usableProviders = $forced !== null ? [$forced] : [];
+        } else {
+            $usableProviders = $providers->getProviders();
+        }
+
+        return array_map(function (AIProvider $provider): array {
+            return [
+                'id' => $provider->getId(),
+                'name' => $provider->getName(),
+                'isConfigured' => $provider->isConfigured(
+                    $this->configuration->getProviderConfiguration($provider->getId())
+                ),
+            ];
+        }, $usableProviders);
     }
 }

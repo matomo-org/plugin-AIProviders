@@ -24,7 +24,7 @@ use Piwik\Plugins\AIProviders\CanonicalMessage;
  */
 class Google extends AIProvider
 {
-    private const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
+    private const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
 
     public function __construct()
     {
