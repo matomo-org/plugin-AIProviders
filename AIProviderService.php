@@ -377,10 +377,7 @@ class AIProviderService
     /**
      * Returns the providers the given caller can run completions through,
      * flagged with whether credentials are in place. Follows the provider
-     * resolution of {@link complete()}, including restricted providers for
-     * allowlisted callers (and for everyone on unmanaged instances). A forced
-     * provider that is not registered yields an empty list where complete()
-     * would throw.
+     * resolution of {@link complete()}.
      *
      * The caller name is self-declared (same trust model as complete()):
      * pass a hardcoded plugin name, and gate any HTTP exposure of the result
