@@ -199,16 +199,13 @@ class AIProviderService
     }
 
     /**
-     * Resolves which provider a request runs through: the provider forced by
-     * a managed environment, then the caller's requested provider (always on
-     * unmanaged instances; on managed instances only for callers on the
-     * `providerSelectionAllowlist` — the caller name is self-declared, see
-     * {@link Configuration::isPluginAllowedToSelectProvider()} for why this
-     * is a policy gate, not a sandbox), then the configured default.
+     * Resolves which provider a request runs through: the caller's requested
+     * provider (unless {@link isLockedToForcedProvider()}), then the forced
+     * provider, then the configured default.
      *
      * `stripRequestedModel` is true when the forced provider overrode the
-     * request, in which case the caller must also drop the requested model
-     * because the model decides cost on managed instances.
+     * request; the requested model must then be dropped too, because the
+     * model decides cost on managed instances.
      *
      * @return array{providerId: string, stripRequestedModel: bool}
      */
