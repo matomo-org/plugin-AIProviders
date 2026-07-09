@@ -34,7 +34,7 @@ class GoogleConverseTest extends TestCase
 
         $gemini->converse($this->simpleRequest(), self::CONFIGURATION);
 
-        $this->assertStringContainsString('gemini-2.5-flash', $gemini->sentUrl);
+        $this->assertStringContainsString('gemini-3.1-flash-lite', $gemini->sentUrl);
         $this->assertStringContainsString(':generateContent', $gemini->sentUrl);
         $this->assertSame(['x-goog-api-key' => 'secret-gemini-key'], $gemini->sentHeaders);
         $this->assertSame(
@@ -373,7 +373,7 @@ class GoogleConverseTest extends TestCase
         $this->assertSame(12, $response->getInputTokens());
         $this->assertSame(7, $response->getOutputTokens());
         $this->assertSame('google', $response->getProviderId());
-        $this->assertSame('gemini-2.5-flash-lite', $response->getModel());
+        $this->assertSame('gemini-3.1-flash-lite', $response->getModel());
     }
 
     public function testSynthesizedIdResolvesBackToFunctionNameOnFollowUpTurn(): void
