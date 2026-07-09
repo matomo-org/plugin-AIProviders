@@ -109,9 +109,41 @@ abstract class AIProvider
         return $this->supportsCustomEndpoint;
     }
 
+    public function supportsFipsEndpoint(): bool
+    {
+        return false;
+    }
+
+    public function endpointFieldRequiresUrl(): bool
+    {
+        return true;
+    }
+
     public function getDefaultEndpointUrl(): string
     {
         return '';
+    }
+
+    /**
+     * Expands shorthand endpoint input (e.g. a bare AWS region) into the URL
+     * to validate and store. Unrecognized values pass through unchanged so
+     * URL validation still rejects them.
+     */
+    public function normalizeEndpointUrl(string $endpointUrl): string
+    {
+        return $endpointUrl;
+    }
+
+    /** Translation key for the endpoint field's label in the admin UI. */
+    public function getEndpointFieldTitle(): string
+    {
+        return 'AIProviders_EndpointUrl';
+    }
+
+    /** Translation key for the endpoint field's placeholder in the admin UI. */
+    public function getEndpointFieldPlaceholder(): string
+    {
+        return 'AIProviders_EndpointUrlPlaceholder';
     }
 
     public function getDefaultModel(): string
@@ -178,6 +210,17 @@ abstract class AIProvider
      * @param array<string, string> $configuration
      */
     public function verifyConnection(array $configuration): void
+    {
+        $this->verifyConnectionWithCompletion($configuration);
+    }
+
+    /**
+     * Probes the connection with completion. Providers with a cheaper
+     * probe override verifyConnection() but can reuse this.
+     *
+     * @param array<string, string> $configuration
+     */
+    protected function verifyConnectionWithCompletion(array $configuration): void
     {
         $request = (new AIRequest('Reply with the single word: OK', 'AIProviders'))
             ->withFeatureKey('test-connection')
@@ -781,6 +824,10 @@ abstract class AIProvider
      *     name: string,
      *     description: string,
      *     supportsCustomEndpoint: bool,
+     *     supportsFipsEndpoint: bool,
+     *     defaultEndpointUrl: string,
+     *     endpointFieldTitle: string,
+     *     endpointFieldPlaceholder: string,
      *     defaultModel: string
      * }
      */
@@ -791,6 +838,10 @@ abstract class AIProvider
             'name' => $this->getName(),
             'description' => $this->getDescription(),
             'supportsCustomEndpoint' => $this->supportsCustomEndpoint(),
+            'supportsFipsEndpoint' => $this->supportsFipsEndpoint(),
+            'defaultEndpointUrl' => $this->getDefaultEndpointUrl(),
+            'endpointFieldTitle' => $this->getEndpointFieldTitle(),
+            'endpointFieldPlaceholder' => $this->getEndpointFieldPlaceholder(),
             'defaultModel' => $this->getDefaultModel(),
         ];
     }
@@ -1020,7 +1071,7 @@ abstract class AIProvider
                 continue;
             }
 
-            $errorSuffix = $providerError !== '' ? ': ' . substr($providerError, 0, 300) : '';
+            $errorSuffix = $providerError !== '' ? ': ' . mb_strimwidth($providerError, 0, 300, '…', 'UTF-8') : '';
             $message = sprintf('%s request failed%s.', $this->getName(), $errorSuffix);
 
             if ($status >= 500) {
@@ -1053,6 +1104,10 @@ abstract class AIProvider
             } elseif (isset($error['type']) && is_string($error['type'])) {
                 $message = $error['type'];
             }
+        } elseif (isset($response['message']) && is_string($response['message'])) {
+            // AWS Bedrock errors carry a top-level `message` without an
+            // `error` wrapper.
+            $message = $response['message'];
         }
 
         return $message;
@@ -1173,8 +1228,10 @@ abstract class AIProvider
             return $payload['model'];
         }
 
-        if (preg_match('~/models/([^/:]+)~', $path, $matches)) {
-            return $matches[1];
+        // Google carries the model at /models/<model>:<action>, Bedrock at
+        // /model/<url-encoded model>/converse.
+        if (preg_match('~/models?/([^/:]+)~', $path, $matches)) {
+            return rawurldecode($matches[1]);
         }
 
         return '';

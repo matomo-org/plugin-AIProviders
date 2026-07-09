@@ -86,6 +86,7 @@ function applySettings(nextSettings: Settings) {
       apiKey: '',
       endpointUrl: provider.configuration.endpointUrl || '',
       model: savedModel,
+      useFipsEndpoint: provider.configuration.useFipsEndpoint || false,
     };
   });
   providerConfigurations.value = nextProviderConfigurations;
@@ -244,6 +245,14 @@ function updateEndpointUrl(providerId: string, endpointUrl: string) {
   availableModels.value[providerId] = [];
 }
 
+function updateUseFipsEndpoint(providerId: string, useFipsEndpoint: boolean) {
+  providerConfigurations.value[providerId] = {
+    ...providerConfigurations.value[providerId],
+    useFipsEndpoint,
+  };
+  availableModels.value[providerId] = [];
+}
+
 async function disconnectProvider(providerId: string) {
   disconnectingProviders.value[providerId] = true;
 
@@ -394,6 +403,7 @@ onMounted(loadSettings);
               @update:api-key="updateApiKey(provider.id, $event)"
               @update:endpoint-url="updateEndpointUrl(provider.id, $event)"
               @update:model="updateModel(provider.id, $event)"
+              @update:use-fips-endpoint="updateUseFipsEndpoint(provider.id, $event)"
             />
           </div>
 
@@ -531,6 +541,13 @@ onMounted(loadSettings);
   gap: 16px;
 }
 
+// Query container for the card grid: the content width depends on the admin
+// sidebar, so columns must follow the section width, not the viewport.
+.ai-providers-section {
+  container-type: inline-size;
+}
+
+// Fallback for browsers without container-query support: cards fill and wrap.
 .ai-providers-cards {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   margin-top: 16px;
@@ -538,6 +555,19 @@ onMounted(loadSettings);
 
 .ai-providers-capability-cards {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+// Discrete column counts keep the rows balanced (5 cards: 2+2+1, 3+2).
+@container (min-width: 620px) {
+  .ai-providers-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@container (min-width: 960px) {
+  .ai-providers-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 .ai-providers-default-warning {

@@ -58,6 +58,9 @@ class ConfigurationTest extends IntegrationTestCase
     {
         Config::getInstance()->AIProviders = [];
         putenv('MATOMO_AIPROVIDERS_OPENAI_API_KEY');
+        StaticContainer::getContainer()->set('AIProviders.openaiApiKey', '');
+        StaticContainer::getContainer()->set('AIProviders.openaiEndpointUrl', '');
+        StaticContainer::getContainer()->set('AIProviders.openaiModel', '');
 
         parent::tearDown();
     }
@@ -70,11 +73,15 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertSame(Configuration::CAPABILITY_INSTANT, $settings['defaultCapabilityLevel']);
         $this->assertTrue($settings['canEditProviderConfiguration']);
         $this->assertTrue($settings['canEditCapabilityLevel']);
-        $this->assertCount(4, $settings['providers']);
+        $this->assertCount(5, $settings['providers']);
 
         $customProvider = $this->getProvider($settings, 'custom-provider');
         $this->assertSame('Custom Provider', $customProvider['name']);
         $this->assertTrue($customProvider['supportsCustomEndpoint']);
+
+        $bedrock = $this->getProvider($settings, 'bedrock');
+        $this->assertSame('AWS Bedrock', $bedrock['name']);
+        $this->assertTrue($bedrock['supportsCustomEndpoint']);
     }
 
     public function testSaveSettingsCanBeCalledWithDefaultsBeforeAnyProviderIsConnected(): void
@@ -540,6 +547,26 @@ class ConfigurationTest extends IntegrationTestCase
         $this->assertSame('config-openai-key', $configuration->getProviderConfiguration('openai')['apiKey']);
     }
 
+    public function testDiValueSuppliesApiKey(): void
+    {
+        StaticContainer::getContainer()->set('AIProviders.openaiApiKey', 'di-openai-key');
+
+        $configuration = StaticContainer::get(Configuration::class);
+
+        $this->assertSame('di-openai-key', $configuration->getProviderConfiguration('openai')['apiKey']);
+    }
+
+    public function testDiValueWinsOverConfigFileAndEnvironmentVariable(): void
+    {
+        putenv('MATOMO_AIPROVIDERS_OPENAI_API_KEY=env-openai-key');
+        Config::getInstance()->AIProviders = ['openaiApiKey' => 'config-openai-key'];
+        StaticContainer::getContainer()->set('AIProviders.openaiApiKey', 'di-openai-key');
+
+        $configuration = StaticContainer::get(Configuration::class);
+
+        $this->assertSame('di-openai-key', $configuration->getProviderConfiguration('openai')['apiKey']);
+    }
+
     public function testManagedFlowServesAllowlistedPluginThroughRestrictedProviderWithConfigCredentials(): void
     {
         // Full managed-environment setup: a forced provider, restricted basic providers,
@@ -583,6 +610,57 @@ class ConfigurationTest extends IntegrationTestCase
 
         $this->assertSame(['openai'], $settingsProviderIds);
         $this->assertSame(['openai'], $statusProviderIds);
+    }
+
+    public function testSavingBedrockWithRegionStoresTheNormalizedRegionAndFipsSetting(): void
+    {
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'bedrock' => [
+                    'apiKey' => 'bedrock-long-term-key',
+                    'endpointUrl' => ' EU-Central-1 ',
+                    'useFipsEndpoint' => true,
+                ],
+            ])
+        );
+
+        $stored = StaticContainer::get(Configuration::class)->getProviderConfiguration('bedrock');
+
+        $this->assertSame('eu-central-1', $stored['endpointUrl']);
+        $this->assertTrue($stored['useFipsEndpoint']);
+    }
+
+    public function testSavingBedrockWithOnlyTheFipsSettingIsPersisted(): void
+    {
+        // Semi-managed setups get the API key from the config file, so the
+        // admin may submit nothing but the FIPS toggle.
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'bedrock' => ['useFipsEndpoint' => true],
+            ])
+        );
+
+        $stored = StaticContainer::get(Configuration::class)->getProviderConfiguration('bedrock');
+
+        $this->assertTrue($stored['useFipsEndpoint']);
+    }
+
+    public function testSavingBedrockWithAnUnrecognizedRegionValueStillFails(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('The AWS region for AWS Bedrock is invalid.');
+
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'bedrock' => ['apiKey' => 'bedrock-long-term-key', 'endpointUrl' => 'not a url'],
+            ])
+        );
     }
 
     public function testRestrictedProviderCannotBeTested(): void

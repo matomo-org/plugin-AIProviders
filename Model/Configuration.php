@@ -13,36 +13,32 @@ namespace Piwik\Plugins\AIProviders\Model;
 
 use InvalidArgumentException;
 use Piwik\Config;
+use Piwik\Container\StaticContainer;
 use Piwik\Settings\FieldConfig;
 use Piwik\Settings\Plugin\SystemSetting;
 use Piwik\Plugins\AIProviders\AIProvidersList;
+use Piwik\Plugins\AIProviders\Exception\AIProviderClientException;
 use Piwik\Plugins\AIProviders\Provider\AIProvider;
 
 /**
  * Stores and resolves the AI provider configuration.
  *
- * Provider connection settings come from two sources, merged per field with
- * the config file winning:
+ * Provider connection settings are merged per field in this order:
  *
- * 1. The database, written from the administration UI ("provider credentials"
- *    system setting).
- * 2. The `[AIProviders]` section of `config.ini.php`, or environment
- *    variables, keyed per provider:
+ * 1. Namespaced DI values supplied by the instance owner:
+ *
+ *        AIProviders.openaiApiKey
+ *
+ * 2. The `[AIProviders]` section of `config.ini.php`, or environment variables:
  *
  *        [AIProviders]
  *        openaiApiKey = "..."       ; or env MATOMO_AIPROVIDERS_OPENAI_API_KEY
- *        openaiEndpointUrl = "..."  ; or env MATOMO_AIPROVIDERS_OPENAI_ENDPOINT_URL
+ *        openaiEndpointUrl = "..."       ; or env MATOMO_AIPROVIDERS_OPENAI_ENDPOINT_URL
+ *        bedrockUseFipsEndpoint = "1"    ; or env MATOMO_AIPROVIDERS_BEDROCK_USE_FIPS_ENDPOINT
  *
- *    The config key is `<providerId>` verbatim plus the field suffix; the
- *    environment variable upper-cases the ID and replaces `-` with `_`
- *    (for example `MATOMO_AIPROVIDERS_CUSTOM_PROVIDER_API_KEY`).
+ * 3. The database, written from the administration UI.
  *
- * The config-file source is how a managed environment supplies
- * credentials for providers its own plugins are allowed to target (see
- * `providerSelectionAllowlist` below) without the credentials ever being
- * stored in the database or shown in the UI. On a self-hosted instance both
- * sources belong to the instance owner; config-file credentials simply cannot
- * be edited or removed from the UI.
+ * The DI/config-file sources are how a managed environment supplies credentials.
  */
 class Configuration
 {
@@ -144,6 +140,7 @@ class Configuration
                         'hasApiKey' => !empty($providerConfiguration['apiKey']),
                         'endpointUrl' => $providerConfiguration['endpointUrl'],
                         'model' => $providerConfiguration['model'],
+                        'useFipsEndpoint' => $providerConfiguration['useFipsEndpoint'],
                         'isUsable' => $provider->isConfigured($providerConfiguration),
                     ],
                 ]);
@@ -180,23 +177,16 @@ class Configuration
     }
 
     /**
-     * Returns the effective server-side provider configuration including the
-     * API key: per field, a value from the config file or environment wins
-     * over the database value (see the class docblock for the sources).
-     *
-     * The config file always winning keeps the rule identical on managed and
-     * self-hosted instances. It is still safe in a managed environment because
-     * the UI that writes database credentials is locked there from the start,
-     * so no database value can exist to begin with.
+     * Returns the effective server-side provider configuration including the API key.
      *
      * The returned array contains secrets. It is internal to the AIProviders
      * plugin and its providers and must never be returned from API methods,
-     * logged, or exposed to other plugins; other plugins run completions via
+     * logged, or exposed to other plugins. Other plugins run completions via
      * {@link \Piwik\Plugins\AIProviders\AIProviderService::complete()} and
      * never see credentials.
      *
      * @internal
-     * @return array{apiKey: string, endpointUrl: string, model: string}
+     * @return array{apiKey: string, endpointUrl: string, model: string, useFipsEndpoint: bool}
      */
     public function getProviderConfiguration(string $providerId): array
     {
@@ -204,6 +194,7 @@ class Configuration
             'apiKey' => '',
             'endpointUrl' => '',
             'model' => '',
+            'useFipsEndpoint' => false,
         ];
         $configFileConfiguration = $this->getConfigFileProviderConfiguration($providerId);
 
@@ -217,6 +208,9 @@ class Configuration
             'model' => $configFileConfiguration['model'] !== ''
                 ? $configFileConfiguration['model']
                 : $storedConfiguration['model'],
+            'useFipsEndpoint' => $configFileConfiguration['useFipsEndpoint'] !== null
+                ? $configFileConfiguration['useFipsEndpoint']
+                : $storedConfiguration['useFipsEndpoint'],
         ];
     }
 
@@ -225,7 +219,7 @@ class Configuration
      * unsaved values from the admin UI for connection testing.
      *
      * @param array<string, mixed> $submittedProviderConfiguration
-     * @return array<string, string>
+     * @return array{apiKey: string, endpointUrl: string, model: string, useFipsEndpoint: bool}
      */
     public function getProviderConfigurationForUse(
         AIProvider $provider,
@@ -250,6 +244,7 @@ class Configuration
             ),
             'endpointUrl' => $this->getSubmittedEndpointUrl($submittedProviderConfiguration, $provider),
             'model' => $this->getSubmittedModel($submittedProviderConfiguration, $provider),
+            'useFipsEndpoint' => $this->getSubmittedUseFipsEndpoint($submittedProviderConfiguration, $provider),
         ];
     }
 
@@ -423,7 +418,7 @@ class Configuration
     }
 
     /**
-     * @return array<string, array<string, string>>
+     * @return array<string, array{apiKey: string, endpointUrl: string, model: string, useFipsEndpoint: bool}>
      */
     private function getProviderConfigurations(): array
     {
@@ -449,6 +444,7 @@ class Configuration
                 'model' => isset($providerConfiguration['model']) && is_string($providerConfiguration['model'])
                     ? $providerConfiguration['model']
                     : '',
+                'useFipsEndpoint' => !empty($providerConfiguration['useFipsEndpoint']),
             ];
         }
 
@@ -500,8 +496,9 @@ class Configuration
             $apiKey = $this->getSubmittedApiKey($submittedProviderConfiguration, $existingProviderConfigurations, $providerId);
             $endpointUrl = $this->getSubmittedEndpointUrl($submittedProviderConfiguration, $provider);
             $model = $this->getSubmittedModel($submittedProviderConfiguration, $provider);
+            $useFipsEndpoint = $this->getSubmittedUseFipsEndpoint($submittedProviderConfiguration, $provider);
 
-            if ($apiKey === '' && $endpointUrl === '') {
+            if ($apiKey === '' && $endpointUrl === '' && !$useFipsEndpoint) {
                 continue;
             }
 
@@ -509,6 +506,7 @@ class Configuration
                 'apiKey' => $apiKey,
                 'endpointUrl' => $endpointUrl,
                 'model' => $model,
+                'useFipsEndpoint' => $useFipsEndpoint,
             ];
         }
 
@@ -518,7 +516,7 @@ class Configuration
 
     /**
      * @param array<string, mixed> $submittedProviderConfiguration
-     * @param array<string, array<string, string>> $existingProviderConfigurations
+     * @param array<string, array{apiKey: string, endpointUrl: string, model: string, useFipsEndpoint: bool}> $existingProviderConfigurations
      */
     private function getSubmittedApiKey(
         #[\SensitiveParameter]
@@ -556,6 +554,16 @@ class Configuration
             return '';
         }
 
+        try {
+            $endpointUrl = $provider->normalizeEndpointUrl($endpointUrl);
+        } catch (AIProviderClientException $e) {
+            throw new InvalidArgumentException($e->getMessage(), 0, $e);
+        }
+
+        if (!$provider->endpointFieldRequiresUrl()) {
+            return $endpointUrl;
+        }
+
         $parsedUrl = parse_url($endpointUrl);
         $scheme = is_array($parsedUrl) ? ($parsedUrl['scheme'] ?? '') : '';
 
@@ -570,6 +578,15 @@ class Configuration
         }
 
         return $endpointUrl;
+    }
+
+    /**
+     * @param array<string, mixed> $submittedProviderConfiguration
+     */
+    private function getSubmittedUseFipsEndpoint(array $submittedProviderConfiguration, AIProvider $provider): bool
+    {
+        return $provider->supportsFipsEndpoint()
+            && !empty($submittedProviderConfiguration['useFipsEndpoint']);
     }
 
     /**
@@ -661,10 +678,7 @@ class Configuration
     }
 
     /**
-     * Returns the provider connection settings supplied via the config file or
-     * environment variables (see the class docblock for the exact keys).
-     *
-     * @return array{apiKey: string, endpointUrl: string, model: string}
+     * @return array{apiKey: string, endpointUrl: string, model: string, useFipsEndpoint: bool|null}
      */
     private function getConfigFileProviderConfiguration(string $providerId): array
     {
@@ -672,16 +686,51 @@ class Configuration
             'apiKey' => $this->getConfigFileValue($providerId, 'ApiKey', 'API_KEY'),
             'endpointUrl' => $this->getConfigFileValue($providerId, 'EndpointUrl', 'ENDPOINT_URL'),
             'model' => $this->getConfigFileValue($providerId, 'Model', 'MODEL'),
+            'useFipsEndpoint' => $this->getConfigFileBooleanValue($providerId, 'UseFipsEndpoint', 'USE_FIPS_ENDPOINT'),
         ];
     }
 
+    private function getConfigFileBooleanValue(string $providerId, string $configSuffix, string $envSuffix): ?bool
+    {
+        $diKey = self::PLUGIN_NAME . '.' . $providerId . $configSuffix;
+        $container = StaticContainer::getContainer();
+
+        if ($container->has($diKey)) {
+            return $this->isTruthy($container->get($diKey));
+        }
+
+        $config = Config::getInstance()->AIProviders;
+        $configKey = $providerId . $configSuffix;
+
+        if (is_array($config) && array_key_exists($configKey, $config)) {
+            return $this->isTruthy($config[$configKey]);
+        }
+
+        $envKey = 'MATOMO_AIPROVIDERS_' . strtoupper(str_replace('-', '_', $providerId)) . '_' . $envSuffix;
+        $envValue = getenv($envKey);
+
+        if (is_string($envValue)) {
+            return $this->isTruthy($envValue);
+        }
+
+        return null;
+    }
+
     /**
-     * Reads one provider connection field from the `[AIProviders]` config
-     * section (key `<providerId><configSuffix>`), falling back to the
-     * environment variable `MATOMO_AIPROVIDERS_<PROVIDER_ID>_<ENV_SUFFIX>`.
+     * @param mixed $value
      */
+    private function isTruthy($value): bool
+    {
+        return is_scalar($value) && filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
     private function getConfigFileValue(string $providerId, string $configSuffix, string $envSuffix): string
     {
+        $diValue = $this->getDiConfigValue($providerId, $configSuffix);
+        if ($diValue !== '') {
+            return $diValue;
+        }
+
         $config = Config::getInstance()->AIProviders;
         $configKey = $providerId . $configSuffix;
 
@@ -697,5 +746,19 @@ class Configuration
         }
 
         return '';
+    }
+
+    private function getDiConfigValue(string $providerId, string $configSuffix): string
+    {
+        $diKey = self::PLUGIN_NAME . '.' . $providerId . $configSuffix;
+        $container = StaticContainer::getContainer();
+
+        if (!$container->has($diKey)) {
+            return '';
+        }
+
+        $value = $container->get($diKey);
+
+        return is_string($value) && trim($value) !== '' ? trim($value) : '';
     }
 }
