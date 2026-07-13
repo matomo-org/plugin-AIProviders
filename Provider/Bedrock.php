@@ -45,12 +45,33 @@ class Bedrock extends AIProvider
     /** Timeout for single-shot completions; conversations use the request's own budget. */
     private const COMPLETE_TIMEOUT_SECONDS = 30;
 
-    /** Exact Bedrock model ID fragments that support reasoning_effort. */
+    /** Exact Bedrock model ID fragments that support the gpt-oss reasoning_effort field. */
     private const GPT_OSS_MODEL_PATTERN = '/(?:^|[.\/])openai\.gpt-oss-(?:20b|120b)-1:0$/';
 
     /**
+     * Amazon Nova 2 text models that support the structured reasoningConfig
+     * extended-thinking control. Only Nova 2 Lite is generally available with a
+     * confirmed model ID; the Pro and Omni tiers are still in preview (and Omni
+     * is a multimodal generation model, not a text reasoning model), so they
+     * are intentionally excluded until they reach GA with a verified ID.
+     *
+     * @see https://docs.aws.amazon.com/nova/latest/userguide/extended-thinking.html
+     */
+    private const NOVA_2_MODEL_PATTERN = '/(?:^|[.\/])amazon\.nova-2-lite-v1:0$/';
+
+    /**
+     * Nova 2 does not expose its reasoning text yet: it returns the literal
+     * placeholder "[REDACTED]" (still billed as reasoning tokens). That
+     * placeholder carries no information and must not be surfaced as reasoning.
+     * If AWS starts returning real text it will no longer match and flow through.
+     *
+     * @see https://docs.aws.amazon.com/nova/latest/nova2-userguide/extended-thinking.html
+     */
+    private const REDACTED_REASONING_PATTERN = '/^\[REDACTED\]\.?$/';
+
+    /**
      * First-generation Amazon Nova text models (Micro/Lite/Pro/Premier). Unlike
-     * gpt-oss and Nova 1.5/2, these have no structured reasoning output and no
+     * gpt-oss and Nova 2, these have no structured reasoning output and no
      * reasoning API; they surface chain-of-thought as inline <thinking> tags in
      * the answer text, so that reasoning has to be split out here instead.
      *
@@ -144,7 +165,9 @@ class Bedrock extends AIProvider
             ],
         ];
 
-        $this->applyGptOssReasoningEffort($payload, $model, $request->getCapabilityLevel());
+        // Completions carry a per-request thinking budget that overrides the
+        // capability level, so resolve the effective intent via wantsThinking().
+        $this->applyReasoningConfiguration($payload, $model, $this->wantsThinking($request));
 
         $systemPrompt = $this->getSystemPrompt($request);
         if ($systemPrompt !== null && $systemPrompt !== '') {
@@ -191,7 +214,10 @@ class Bedrock extends AIProvider
             ],
         ];
 
-        $this->applyGptOssReasoningEffort($payload, $model, $request->getCapabilityLevel());
+        // Conversation requests have no thinking budget, so the capability
+        // level alone decides whether reasoning is on.
+        $thinking = $request->getCapabilityLevel() === Configuration::CAPABILITY_THINKING;
+        $this->applyReasoningConfiguration($payload, $model, $thinking);
 
         $systemPrompt = $request->getSystemPrompt();
         if ($systemPrompt !== null && $systemPrompt !== '') {
@@ -213,7 +239,7 @@ class Bedrock extends AIProvider
             $this->bedrockContentToCanonical(
                 is_array($rawContent) ? $rawContent : [],
                 $this->isNovaGen1Model($model),
-                $request->getCapabilityLevel() === Configuration::CAPABILITY_THINKING
+                $thinking
             ),
             $stopReason,
             isset($response['usage']['inputTokens']) ? (int) $response['usage']['inputTokens'] : null,
@@ -578,7 +604,12 @@ class Bedrock extends AIProvider
 
             if (is_array($block['reasoningContent'] ?? null)) {
                 $reasoningText = $this->bedrockReasoningText($block['reasoningContent']);
-                if ($includeReasoning && is_string($reasoningText) && trim($reasoningText) !== '') {
+                if (
+                    $includeReasoning
+                    && is_string($reasoningText)
+                    && trim($reasoningText) !== ''
+                    && !$this->isRedactedReasoning($reasoningText)
+                ) {
                     $canonical[] = ['type' => 'reasoning', 'text' => $reasoningText];
                 }
                 continue;
@@ -639,25 +670,43 @@ class Bedrock extends AIProvider
             : null;
     }
 
+    private function isRedactedReasoning(string $text): bool
+    {
+        return preg_match(self::REDACTED_REASONING_PATTERN, trim($text)) === 1;
+    }
+
     /**
-     * Adds the gpt-oss model-specific reasoning control without changing any
-     * other Bedrock model payload.
+     * Adds the model-family-specific reasoning control to the request payload,
+     * leaving models without a reasoning API untouched.
+     *
+     * gpt-oss exposes a flat `reasoning_effort`, while Nova 2 uses a
+     * structured `reasoningConfig`. Nova gen-1 has no reasoning API and is
+     * handled on the response side instead (see NOVA_GEN1_MODEL_PATTERN).
      *
      * @param array<string, mixed> $payload
      */
-    private function applyGptOssReasoningEffort(array &$payload, string $model, ?string $capabilityLevel): void
+    private function applyReasoningConfiguration(array &$payload, string $model, bool $thinking): void
     {
-        if (!$this->isGptOssModel($model)) {
+        if ($this->isGptOssModel($model)) {
+            $payload['additionalModelRequestFields']['reasoning_effort'] = $thinking ? 'medium' : 'low';
             return;
         }
 
-        $payload['additionalModelRequestFields']['reasoning_effort']
-            = $capabilityLevel === Configuration::CAPABILITY_THINKING ? 'medium' : 'low';
+        if ($this->isNovaReasoningModel($model)) {
+            $payload['additionalModelRequestFields']['reasoningConfig'] = $thinking
+                ? ['type' => 'enabled', 'maxReasoningEffort' => 'medium']
+                : ['type' => 'disabled'];
+        }
     }
 
     private function isGptOssModel(string $model): bool
     {
         return preg_match(self::GPT_OSS_MODEL_PATTERN, $model) === 1;
+    }
+
+    private function isNovaReasoningModel(string $model): bool
+    {
+        return preg_match(self::NOVA_2_MODEL_PATTERN, $model) === 1;
     }
 
     private function isNovaGen1Model(string $model): bool
