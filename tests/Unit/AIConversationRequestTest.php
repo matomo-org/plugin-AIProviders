@@ -39,6 +39,7 @@ class AIConversationRequestTest extends TestCase
         $this->assertSame(2048, $request->getMaxTokens());
         $this->assertSame(AIRequest::DEFAULT_TEMPERATURE, $request->getTemperature());
         $this->assertSame(0.2, $request->getTemperature());
+        $this->assertNull($request->getCapabilityLevel());
         $this->assertSame(AIConversationRequest::DEFAULT_TIMEOUT_SECONDS, $request->getTimeoutSeconds());
         $this->assertSame(60, $request->getTimeoutSeconds());
     }
@@ -66,6 +67,7 @@ class AIConversationRequestTest extends TestCase
             ->withFeatureKey('chat')
             ->withMaxTokens(4096)
             ->withTemperature(0.7)
+            ->withCapabilityLevel('thinking')
             ->withTimeoutSeconds(120);
 
         // The original request is unchanged.
@@ -76,6 +78,7 @@ class AIConversationRequestTest extends TestCase
         $this->assertNull($request->getFeatureKey());
         $this->assertSame(AIConversationRequest::DEFAULT_MAX_TOKENS, $request->getMaxTokens());
         $this->assertSame(AIRequest::DEFAULT_TEMPERATURE, $request->getTemperature());
+        $this->assertNull($request->getCapabilityLevel());
         $this->assertSame(AIConversationRequest::DEFAULT_TIMEOUT_SECONDS, $request->getTimeoutSeconds());
 
         // The derived request carries the new values.
@@ -86,6 +89,7 @@ class AIConversationRequestTest extends TestCase
         $this->assertSame('chat', $modified->getFeatureKey());
         $this->assertSame(4096, $modified->getMaxTokens());
         $this->assertSame(0.7, $modified->getTemperature());
+        $this->assertSame('thinking', $modified->getCapabilityLevel());
         $this->assertSame(120, $modified->getTimeoutSeconds());
 
         // The messages and caller plugin carry over to derived requests.
@@ -104,6 +108,7 @@ class AIConversationRequestTest extends TestCase
         $this->assertNotSame($request, $request->withFeatureKey('chat'));
         $this->assertNotSame($request, $request->withMaxTokens(1));
         $this->assertNotSame($request, $request->withTemperature(0.5));
+        $this->assertNotSame($request, $request->withCapabilityLevel('thinking'));
         $this->assertNotSame($request, $request->withTimeoutSeconds(10));
     }
 

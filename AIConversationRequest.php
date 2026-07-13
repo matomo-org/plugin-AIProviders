@@ -116,6 +116,14 @@ class AIConversationRequest
     private $temperature = AIRequest::DEFAULT_TEMPERATURE;
 
     /**
+     * Requested model capability level (see Configuration::CAPABILITY_*), or
+     * null to defer to the configured default.
+     *
+     * @var string|null
+     */
+    private $capabilityLevel = null;
+
+    /**
      * Provider HTTP timeout. Conversational round-trips replay the whole
      * history and may produce tool calls, so the default is more generous
      * than for simple completions.
@@ -207,6 +215,14 @@ class AIConversationRequest
         return $request;
     }
 
+    public function withCapabilityLevel(?string $capabilityLevel): self
+    {
+        $request = clone $this;
+        $request->capabilityLevel = $capabilityLevel;
+
+        return $request;
+    }
+
     public function withTimeoutSeconds(int $timeoutSeconds): self
     {
         $request = clone $this;
@@ -264,6 +280,11 @@ class AIConversationRequest
     public function getTemperature(): float
     {
         return $this->temperature;
+    }
+
+    public function getCapabilityLevel(): ?string
+    {
+        return $this->capabilityLevel;
     }
 
     public function getTimeoutSeconds(): int

@@ -143,6 +143,31 @@ class ConverseServiceTest extends IntegrationTestCase
         );
     }
 
+    public function testConverseAppliesConfiguredDefaultCapabilityLevel(): void
+    {
+        $this->api->saveSettings('', Configuration::CAPABILITY_THINKING, '{}');
+        $this->forceCapabilityRecordingDefaultProvider();
+
+        $response = StaticContainer::get(AIProviderService::class)->converse(
+            new AIConversationRequest([], 'Test')
+        );
+
+        $this->assertSame(Configuration::CAPABILITY_THINKING, $response->getModel());
+    }
+
+    public function testConversePreservesRequestCapabilityOverride(): void
+    {
+        $this->api->saveSettings('', Configuration::CAPABILITY_THINKING, '{}');
+        $this->forceCapabilityRecordingDefaultProvider();
+
+        $response = StaticContainer::get(AIProviderService::class)->converse(
+            (new AIConversationRequest([], 'Test'))
+                ->withCapabilityLevel(Configuration::CAPABILITY_INSTANT)
+        );
+
+        $this->assertSame(Configuration::CAPABILITY_INSTANT, $response->getModel());
+    }
+
     public function testForcedProviderOverridesRequestedProviderAndStripsModel(): void
     {
         // Simulate a managed environment forcing a conversation-capable
@@ -293,6 +318,15 @@ class ConverseServiceTest extends IntegrationTestCase
         Config::getInstance()->AIProviders = ['defaultProvider' => CompletionOnlyTestProvider::ID];
     }
 
+    private function forceCapabilityRecordingDefaultProvider(): void
+    {
+        Piwik::addAction('AIProviders.addAIProviders', function (AIProvidersList $providers): void {
+            $providers->addProvider(new CapabilityRecordingTestProvider());
+        });
+
+        Config::getInstance()->AIProviders = ['defaultProvider' => CapabilityRecordingTestProvider::ID];
+    }
+
     /**
      * Mocks the Anthropic Messages endpoint for converse() calls.
      *
@@ -355,5 +389,41 @@ class CompletionOnlyTestProvider extends AIProvider
     public function complete(AIRequest $request, array $configuration): AIProviderResponse
     {
         return new AIProviderResponse($this->getId(), $this->getName(), 'test-model', 'ok');
+    }
+}
+
+class CapabilityRecordingTestProvider extends AIProvider
+{
+    public const ID = 'capability-recording';
+
+    public function __construct()
+    {
+        parent::__construct(self::ID, 'Capability Recording', 'Capability recording test provider.');
+    }
+
+    public function isConfigured(array $configuration): bool
+    {
+        return true;
+    }
+
+    public function complete(AIRequest $request, array $configuration): AIProviderResponse
+    {
+        return new AIProviderResponse($this->getId(), $this->getName(), 'test-model', 'ok');
+    }
+
+    public function supportsConversations(): bool
+    {
+        return true;
+    }
+
+    public function converse(AIConversationRequest $request, array $configuration): AIConversationResponse
+    {
+        return new AIConversationResponse(
+            $this->getId(),
+            $this->getName(),
+            (string) $request->getCapabilityLevel(),
+            [['type' => 'text', 'text' => 'ok']],
+            AIConversationResponse::STOP_END_TURN
+        );
     }
 }
