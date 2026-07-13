@@ -437,6 +437,97 @@ class BedrockConverseTest extends TestCase
         $this->assertSame(['json'], array_keys($spec['inputSchema']));
     }
 
+    /**
+     * Mistral Large only returns a structured toolUse block when a tool call is
+     * forced via toolChoice; under the default it leaks the call back as text.
+     * The provider forces `toolChoice: {any}` for this family only.
+     *
+     * @dataProvider getMistralLargeModelData
+     */
+    public function testMistralLargeForcesToolChoiceAny(string $model): void
+    {
+        $bedrock = new RecordingBedrock();
+
+        $bedrock->converse($this->toolRequestForModel($model), self::CONFIGURATION);
+
+        $toolConfig = $bedrock->sentPayload['toolConfig'];
+        $this->assertArrayHasKey('toolChoice', $toolConfig);
+        $this->assertEquals(['any' => new \stdClass()], $toolConfig['toolChoice']);
+
+        // The forced choice must serialise as an object (`{}`), not an empty
+        // array (`[]`); Bedrock rejects `"any":[]`.
+        $this->assertStringContainsString(
+            '"toolChoice":{"any":{}}',
+            (string) json_encode($bedrock->sentPayload)
+        );
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public function getMistralLargeModelData(): array
+    {
+        return [
+            'Large 2402' => ['mistral.mistral-large-2402-v1:0'],
+            'Large 2 (2407)' => ['mistral.mistral-large-2407-v1:0'],
+            'Large 3' => ['mistral.mistral-large-3-675b-instruct'],
+            'regional profile' => ['us.mistral.mistral-large-2402-v1:0'],
+            'inference-profile ARN' => [
+                'arn:aws:bedrock:us-east-1:123456789012:inference-profile/eu.mistral.mistral-large-2402-v1:0',
+            ],
+        ];
+    }
+
+    /**
+     * Every other family (including Magistral and the other Mistral tiers)
+     * returns structured tool use under the default toolChoice, so the provider
+     * must not force one on them.
+     *
+     * @dataProvider getNonMistralLargeModelData
+     */
+    public function testNonMistralLargeModelsDoNotForceToolChoice(string $model): void
+    {
+        $bedrock = new RecordingBedrock();
+
+        $bedrock->converse($this->toolRequestForModel($model), self::CONFIGURATION);
+
+        // The catalogue is still emitted; only the forced toolChoice is absent.
+        $this->assertArrayHasKey('toolConfig', $bedrock->sentPayload);
+        $this->assertArrayNotHasKey('toolChoice', $bedrock->sentPayload['toolConfig']);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public function getNonMistralLargeModelData(): array
+    {
+        return [
+            'Magistral' => ['mistral.magistral-small-2509'],
+            'Ministral 8B' => ['mistral.ministral-3-8b'],
+            'Ministral 3B' => ['mistral.ministral-3b'],
+            'Mistral Small' => ['mistral.mistral-small-2402-v1:0'],
+            'Mistral 7B' => ['mistral.mistral-7b-instruct-v0:2'],
+            'Claude' => ['anthropic.claude-3-7-sonnet-20250219-v1:0'],
+            'Nova' => ['amazon.nova-lite-v1:0'],
+            'gpt-oss' => ['openai.gpt-oss-120b-1:0'],
+            'embedded lookalike' => ['mymistral.mistral-large-2402-v1:0'],
+        ];
+    }
+
+    public function testMistralLargeWithoutToolsSendsNoToolConfig(): void
+    {
+        // toolChoice only rides along with a tool catalogue; a plain-chat turn
+        // to Mistral Large must not gain an empty toolConfig.
+        $bedrock = new RecordingBedrock();
+
+        $bedrock->converse(
+            $this->simpleRequest()->withModel('mistral.mistral-large-2402-v1:0'),
+            self::CONFIGURATION
+        );
+
+        $this->assertArrayNotHasKey('toolConfig', $bedrock->sentPayload);
+    }
+
     public function testResponseToolUseAndUnknownBlocksAreMappedToCanonical(): void
     {
         $bedrock = new RecordingBedrock();
@@ -1255,6 +1346,19 @@ class BedrockConverseTest extends TestCase
             [['role' => 'user', 'content' => [['type' => 'text', 'text' => 'hello']]]],
             'AskMatomo'
         );
+    }
+
+    private function toolRequestForModel(string $model): AIConversationRequest
+    {
+        return $this->simpleRequest()
+            ->withModel($model)
+            ->withTools([
+                [
+                    'name' => 'matomo_site_list',
+                    'description' => 'Lists sites',
+                    'inputSchema' => ['type' => 'object'],
+                ],
+            ]);
     }
 }
 

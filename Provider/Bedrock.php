@@ -82,6 +82,18 @@ class Bedrock extends AIProvider
     /** Balanced leading inline reasoning blocks emitted by Nova gen-1 responses. */
     private const LEADING_REASONING_PATTERN = '/^\s*<(reasoning|think|thinking)>/i';
 
+    /**
+     * Mistral Large models. Unlike other Converse families, Large only returns
+     * a structured toolUse block when a tool call is forced with
+     * `toolChoice: {any}`; under the default (auto) its tool calls leak back as
+     * plain text and are lost. Observed behaviour: with `any` set the model
+     * still answers directly when no tool is needed (contrary to the documented
+     * "must request at least one tool"), so forcing it here does not break
+     * conceptual or clarifying turns. This is undocumented Bedrock behaviour and
+     * is scoped to Large only; every other family works under auto.
+     */
+    private const MISTRAL_LARGE_MODEL_PATTERN = '/(?:^|[.\/])mistral\.mistral-large-/i';
+
     public function __construct()
     {
         parent::__construct(
@@ -226,6 +238,12 @@ class Bedrock extends AIProvider
 
         $toolConfig = $this->toolCatalogToBedrock($request->getTools());
         if ($toolConfig !== null) {
+            // Mistral Large only emits a structured toolUse block when tool use
+            // is forced (see MISTRAL_LARGE_MODEL_PATTERN). stdClass keeps the
+            // json_encode output as `{}` rather than `[]`.
+            if ($this->isMistralLargeModel($model)) {
+                $toolConfig['toolChoice'] = ['any' => new \stdClass()];
+            }
             $payload['toolConfig'] = $toolConfig;
         }
 
@@ -712,6 +730,11 @@ class Bedrock extends AIProvider
     private function isNovaGen1Model(string $model): bool
     {
         return preg_match(self::NOVA_GEN1_MODEL_PATTERN, $model) === 1;
+    }
+
+    private function isMistralLargeModel(string $model): bool
+    {
+        return preg_match(self::MISTRAL_LARGE_MODEL_PATTERN, $model) === 1;
     }
 
     /**
