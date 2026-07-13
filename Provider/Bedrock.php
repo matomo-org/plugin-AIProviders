@@ -48,6 +48,19 @@ class Bedrock extends AIProvider
     /** Exact Bedrock model ID fragments that support reasoning_effort. */
     private const GPT_OSS_MODEL_PATTERN = '/(?:^|[.\/])openai\.gpt-oss-(?:20b|120b)-1:0$/';
 
+    /**
+     * First-generation Amazon Nova text models (Micro/Lite/Pro/Premier). Unlike
+     * gpt-oss and Nova 1.5/2, these have no structured reasoning output and no
+     * reasoning API; they surface chain-of-thought as inline <thinking> tags in
+     * the answer text, so that reasoning has to be split out here instead.
+     *
+     * @see https://docs.aws.amazon.com/nova/latest/userguide/prompting-chain-of-thought.html
+     */
+    private const NOVA_GEN1_MODEL_PATTERN = '/(?:^|[.\/])amazon\.nova-(?:micro|lite|pro|premier)-v1:0$/';
+
+    /** Balanced leading inline reasoning blocks emitted by Nova gen-1 responses. */
+    private const LEADING_REASONING_PATTERN = '/^\s*<(reasoning|think|thinking)>/i';
+
     public function __construct()
     {
         parent::__construct(
@@ -147,7 +160,7 @@ class Bedrock extends AIProvider
         return $this->buildResponse(
             $request,
             $model,
-            $this->extractText($response),
+            $this->extractText($response, $this->isNovaGen1Model($model)),
             isset($response['usage']['inputTokens']) ? (int) $response['usage']['inputTokens'] : null,
             isset($response['usage']['outputTokens']) ? (int) $response['usage']['outputTokens'] : null,
             $stopReason
@@ -199,6 +212,7 @@ class Bedrock extends AIProvider
             $model,
             $this->bedrockContentToCanonical(
                 is_array($rawContent) ? $rawContent : [],
+                $this->isNovaGen1Model($model),
                 $request->getCapabilityLevel() === Configuration::CAPABILITY_THINKING
             ),
             $stopReason,
@@ -551,8 +565,11 @@ class Bedrock extends AIProvider
      * @param list<mixed> $content Bedrock assistant content blocks
      * @return list<CanonicalContentBlockArray> canonical assistant content blocks
      */
-    private function bedrockContentToCanonical(array $content, bool $includeReasoning): array
-    {
+    private function bedrockContentToCanonical(
+        array $content,
+        bool $splitInlineReasoning,
+        bool $includeReasoning
+    ): array {
         $canonical = [];
         foreach ($content as $block) {
             if (!is_array($block)) {
@@ -568,7 +585,15 @@ class Bedrock extends AIProvider
             }
 
             if (is_string($block['text'] ?? null)) {
-                $canonical[] = ['type' => 'text', 'text' => $block['text']];
+                if ($splitInlineReasoning) {
+                    foreach ($this->splitLeadingReasoning($block['text']) as $splitBlock) {
+                        if ($includeReasoning || $splitBlock['type'] !== 'reasoning') {
+                            $canonical[] = $splitBlock;
+                        }
+                    }
+                } else {
+                    $canonical[] = ['type' => 'text', 'text' => $block['text']];
+                }
                 continue;
             }
 
@@ -635,17 +660,67 @@ class Bedrock extends AIProvider
         return preg_match(self::GPT_OSS_MODEL_PATTERN, $model) === 1;
     }
 
+    private function isNovaGen1Model(string $model): bool
+    {
+        return preg_match(self::NOVA_GEN1_MODEL_PATTERN, $model) === 1;
+    }
+
+    /**
+     * Splits balanced leading reasoning tags from the remaining answer text.
+     *
+     * Nova gen-1 models emit their chain-of-thought as inline <thinking> tags
+     * at the start of the answer instead of as structured reasoningContent, so
+     * the reasoning has to be separated from the visible answer here.
+     *
+     * @return list<array{type: string, text: string}>
+     */
+    private function splitLeadingReasoning(string $raw): array
+    {
+        $blocks = [];
+        $rest = $raw;
+
+        while (preg_match(self::LEADING_REASONING_PATTERN, $rest, $open, PREG_OFFSET_CAPTURE) === 1) {
+            $reasoningStart = strlen($open[0][0]);
+            $closePattern = '/<\/' . preg_quote($open[1][0], '/') . '>/i';
+
+            if (preg_match($closePattern, $rest, $close, PREG_OFFSET_CAPTURE, $reasoningStart) !== 1) {
+                break;
+            }
+
+            $reasoning = trim(substr($rest, $reasoningStart, $close[0][1] - $reasoningStart));
+            if ($reasoning !== '') {
+                $blocks[] = ['type' => 'reasoning', 'text' => $reasoning];
+            }
+
+            $rest = substr($rest, $close[0][1] + strlen($close[0][0]));
+        }
+
+        if (trim($rest) !== '') {
+            $blocks[] = ['type' => 'text', 'text' => $rest];
+        }
+
+        return $blocks;
+    }
+
     /**
      * @param array<string, mixed> $response
      */
-    private function extractText(array $response): string
+    private function extractText(array $response, bool $stripInlineReasoning): string
     {
         $content = $response['output']['message']['content'] ?? [];
 
         if (is_array($content)) {
             foreach ($content as $block) {
                 if (isset($block['text']) && is_string($block['text'])) {
-                    return $block['text'];
+                    if (!$stripInlineReasoning) {
+                        return $block['text'];
+                    }
+
+                    foreach ($this->splitLeadingReasoning($block['text']) as $splitBlock) {
+                        if ($splitBlock['type'] === 'text') {
+                            return $splitBlock['text'];
+                        }
+                    }
                 }
             }
         }

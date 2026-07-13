@@ -854,6 +854,188 @@ class BedrockConverseTest extends TestCase
         $this->assertSame([['type' => 'text', 'text' => 'Here is the answer.']], $response->getContent());
     }
 
+    public function getNovaGen1InlineReasoningTagData(): array
+    {
+        return [
+            'reasoning' => ['reasoning'],
+            'think' => ['think'],
+            'thinking' => ['thinking'],
+        ];
+    }
+
+    /**
+     * Nova gen-1 models have no structured reasoningContent; they emit their
+     * chain-of-thought as inline <thinking> tags at the start of the answer,
+     * which must be split into a separate reasoning block.
+     *
+     * @dataProvider getNovaGen1InlineReasoningTagData
+     */
+    public function testNovaGen1LeadingReasoningIsExposedForThinkingRequests(string $tag): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [[
+                'text' => sprintf('<%1$s>internal thoughts</%1$s>Here is the answer.', $tag),
+            ]]]],
+            'stopReason' => 'end_turn',
+        ];
+
+        $response = $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel('amazon.nova-lite-v1:0')
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame(
+            [
+                ['type' => 'reasoning', 'text' => 'internal thoughts'],
+                ['type' => 'text', 'text' => 'Here is the answer.'],
+            ],
+            $response->getContent()
+        );
+    }
+
+    public function testNovaGen1LeadingReasoningIsRemovedForInstantRequests(): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [[
+                'text' => '<thinking>internal thoughts</thinking>Here is the answer.',
+            ]]]],
+            'stopReason' => 'end_turn',
+        ];
+
+        $response = $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel('amazon.nova-lite-v1:0')
+                ->withCapabilityLevel(Configuration::CAPABILITY_INSTANT),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame([['type' => 'text', 'text' => 'Here is the answer.']], $response->getContent());
+    }
+
+    public function testNovaGen1MalformedLeadingReasoningRemainsAnswerText(): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [['text' => '<thinking>unfinished answer']]]],
+            'stopReason' => 'max_tokens',
+        ];
+
+        $response = $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel('amazon.nova-lite-v1:0')
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame(
+            [['type' => 'text', 'text' => '<thinking>unfinished answer']],
+            $response->getContent()
+        );
+    }
+
+    public function getStructuredReasoningModelData(): array
+    {
+        return [
+            // gpt-oss and Nova 1.5/2 surface reasoning as structured
+            // reasoningContent, so a leading <thinking> tag in their text is a
+            // genuine answer, not reasoning, and must not be split out.
+            'gpt-oss' => ['openai.gpt-oss-120b-1:0'],
+            'Nova 1.5 lite' => ['amazon.nova-lite-1-5-v1:0'],
+            'Nova 2 lite' => ['amazon.nova-2-lite-v1:0'],
+            'Claude' => ['anthropic.claude-3-7-sonnet-20250219-v1:0'],
+            'gen-1 lookalike' => ['myamazon.nova-lite-v1:0'],
+        ];
+    }
+
+    /**
+     * @dataProvider getStructuredReasoningModelData
+     */
+    public function testModelsWithoutInlineReasoningKeepTagsUnchanged(string $model): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [[
+                'text' => '<thinking>ordinary answer text</thinking>Still answer text.',
+            ]]]],
+            'stopReason' => 'end_turn',
+        ];
+
+        $response = $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel($model)
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame(
+            [['type' => 'text', 'text' => '<thinking>ordinary answer text</thinking>Still answer text.']],
+            $response->getContent()
+        );
+    }
+
+    public function getNovaGen1ProfileAndArnModelData(): array
+    {
+        return [
+            'plain' => ['amazon.nova-lite-v1:0'],
+            'region profile' => ['us.amazon.nova-lite-v1:0'],
+            'micro tier' => ['amazon.nova-micro-v1:0'],
+            'arn' => ['arn:aws:bedrock:us-east-1:123:inference-profile/amazon.nova-pro-v1:0'],
+        ];
+    }
+
+    /**
+     * @dataProvider getNovaGen1ProfileAndArnModelData
+     */
+    public function testNovaGen1InlineReasoningIsSplitAcrossProfilesAndArns(string $model): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [[
+                'text' => '<thinking>internal thoughts</thinking>Here is the answer.',
+            ]]]],
+            'stopReason' => 'end_turn',
+        ];
+
+        $response = $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel($model)
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame(
+            [
+                ['type' => 'reasoning', 'text' => 'internal thoughts'],
+                ['type' => 'text', 'text' => 'Here is the answer.'],
+            ],
+            $response->getContent()
+        );
+    }
+
+    public function testCompleteStripsNovaGen1LeadingReasoning(): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [[
+                'text' => '<reasoning>internal thoughts</reasoning>Visible answer.',
+            ]]]],
+            'stopReason' => 'end_turn',
+        ];
+
+        $response = $bedrock->complete(
+            (new AIRequest('hello', 'AskMatomo'))
+                ->withModel('amazon.nova-lite-v1:0')
+                ->withCapabilityLevel(Configuration::CAPABILITY_INSTANT),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame('Visible answer.', $response->getText());
+    }
+
     public function testCanonicalReasoningIsNotReplayed(): void
     {
         $bedrock = new RecordingBedrock();
