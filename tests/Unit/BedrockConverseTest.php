@@ -15,6 +15,7 @@ use PHPUnit\Framework\TestCase;
 use Piwik\Plugins\AIProviders\AIConversationRequest;
 use Piwik\Plugins\AIProviders\AIRequest;
 use Piwik\Plugins\AIProviders\Exception\AIProviderClientException;
+use Piwik\Plugins\AIProviders\Model\Configuration;
 use Piwik\Plugins\AIProviders\Provider\Bedrock;
 
 /**
@@ -91,6 +92,10 @@ class BedrockConverseTest extends TestCase
         $this->assertSame(
             ['maxTokens' => 32, 'temperature' => 0.2],
             $bedrock->sentPayload['inferenceConfig']
+        );
+        $this->assertSame(
+            ['reasoning_effort' => 'low'],
+            $bedrock->sentPayload['additionalModelRequestFields']
         );
         $this->assertSame('openai.gpt-oss-120b-1:0', $bedrock->sentModel);
         // Completions run with the provider's fixed timeout.
@@ -450,12 +455,14 @@ class BedrockConverseTest extends TestCase
             'usage' => ['inputTokens' => 7, 'outputTokens' => 5],
         ];
 
-        $response = $bedrock->converse($this->simpleRequest(), self::CONFIGURATION);
+        $response = $bedrock->converse(
+            $this->simpleRequest()->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
 
-        // Unknown Bedrock block shapes (reasoningContent, …) are dropped;
-        // text and toolUse blocks come back in the canonical shape.
         $this->assertSame(
             [
+                ['type' => 'reasoning', 'text' => 'thinking …'],
                 ['type' => 'text', 'text' => 'Checking your sites now.'],
                 ['type' => 'tool_use', 'id' => 'tu_42', 'name' => 'matomo_demo', 'input' => ['idSite' => 1]],
             ],
@@ -700,6 +707,168 @@ class BedrockConverseTest extends TestCase
         $this->assertSame(
             'https://bedrock.us-east-1.amazonaws.com/foundation-models?byInferenceType=ON_DEMAND',
             $bedrock->sentGetUrl
+        );
+    }
+
+    /**
+     * @dataProvider getGptOssReasoningEffortData
+     */
+    public function testGptOssMapsCapabilityToReasoningEffort(
+        string $method,
+        string $model,
+        string $capabilityLevel,
+        string $expectedEffort
+    ): void {
+        $bedrock = new RecordingBedrock();
+
+        if ($method === 'complete') {
+            $bedrock->complete(
+                (new AIRequest('hello', 'AskMatomo'))
+                    ->withModel($model)
+                    ->withCapabilityLevel($capabilityLevel),
+                self::CONFIGURATION
+            );
+        } else {
+            $bedrock->converse(
+                $this->simpleRequest()
+                    ->withModel($model)
+                    ->withCapabilityLevel($capabilityLevel),
+                self::CONFIGURATION
+            );
+        }
+
+        $this->assertSame(
+            ['reasoning_effort' => $expectedEffort],
+            $bedrock->sentPayload['additionalModelRequestFields']
+        );
+    }
+
+    public function getGptOssReasoningEffortData(): array
+    {
+        $cases = [];
+        foreach (['complete', 'converse'] as $method) {
+            foreach (['openai.gpt-oss-20b-1:0', 'openai.gpt-oss-120b-1:0'] as $model) {
+                $cases[$method . ' instant ' . $model] = [
+                    $method,
+                    $model,
+                    Configuration::CAPABILITY_INSTANT,
+                    'low',
+                ];
+                $cases[$method . ' thinking ' . $model] = [
+                    $method,
+                    $model,
+                    Configuration::CAPABILITY_THINKING,
+                    'medium',
+                ];
+            }
+        }
+
+        return $cases;
+    }
+
+    /**
+     * @dataProvider getProfileAndArnModelData
+     */
+    public function testGptOssProfilesAndArnsAreRecognized(string $model): void
+    {
+        $bedrock = new RecordingBedrock();
+
+        $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel($model)
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame(
+            ['reasoning_effort' => 'medium'],
+            $bedrock->sentPayload['additionalModelRequestFields']
+        );
+    }
+
+    public function getProfileAndArnModelData(): array
+    {
+        return [
+            'regional profile' => ['us.openai.gpt-oss-20b-1:0'],
+            'foundation model ARN' => [
+                'arn:aws:bedrock:us-east-1::foundation-model/openai.gpt-oss-120b-1:0',
+            ],
+            'regional profile ARN' => [
+                'arn:aws:bedrock:eu-west-1:123456789012:inference-profile/eu.openai.gpt-oss-20b-1:0',
+            ],
+        ];
+    }
+
+    /**
+     * @dataProvider getNonGptOssModelData
+     */
+    public function testOtherModelsLeaveReasoningFieldsOutOfBothPayloads(string $model): void
+    {
+        $bedrock = new RecordingBedrock();
+
+        $bedrock->complete(
+            (new AIRequest('hello', 'AskMatomo'))
+                ->withModel($model)
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+        $this->assertArrayNotHasKey('additionalModelRequestFields', $bedrock->sentPayload);
+
+        $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel($model)
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+        $this->assertArrayNotHasKey('additionalModelRequestFields', $bedrock->sentPayload);
+    }
+
+    public function getNonGptOssModelData(): array
+    {
+        return [
+            'Claude' => ['anthropic.claude-3-7-sonnet-20250219-v1:0'],
+            'Nova' => ['amazon.nova-lite-v1:0'],
+            'other OpenAI model' => ['openai.gpt-4o'],
+            'other gpt-oss size' => ['openai.gpt-oss-7b-1:0'],
+            'embedded lookalike' => ['myopenai.gpt-oss-120b-1:0'],
+            'suffixed lookalike' => ['openai.gpt-oss-120b-1:0-extra'],
+        ];
+    }
+
+    public function testStructuredReasoningIsHiddenForInstantRequests(): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [
+                ['reasoningContent' => ['reasoningText' => ['text' => 'internal thoughts']]],
+                ['text' => 'Here is the answer.'],
+            ]]],
+            'stopReason' => 'end_turn',
+        ];
+
+        $response = $bedrock->converse(
+            $this->simpleRequest()->withCapabilityLevel(Configuration::CAPABILITY_INSTANT),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame([['type' => 'text', 'text' => 'Here is the answer.']], $response->getContent());
+    }
+
+    public function testCanonicalReasoningIsNotReplayed(): void
+    {
+        $bedrock = new RecordingBedrock();
+        $request = new AIConversationRequest([
+            ['role' => 'assistant', 'content' => [
+                ['type' => 'reasoning', 'text' => 'internal thoughts'],
+                ['type' => 'text', 'text' => 'Visible answer.'],
+            ]],
+        ], 'AskMatomo');
+
+        $bedrock->converse($request, self::CONFIGURATION);
+
+        $this->assertSame(
+            [['role' => 'assistant', 'content' => [['text' => 'Visible answer.']]]],
+            $bedrock->sentPayload['messages']
         );
     }
 

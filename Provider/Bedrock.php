@@ -17,6 +17,7 @@ use Piwik\Plugins\AIProviders\AIProviderResponse;
 use Piwik\Plugins\AIProviders\AIRequest;
 use Piwik\Plugins\AIProviders\CanonicalMessage;
 use Piwik\Plugins\AIProviders\Exception\AIProviderClientException;
+use Piwik\Plugins\AIProviders\Model\Configuration;
 
 /**
  * AWS Bedrock provider using the Converse HTTP API.
@@ -43,6 +44,9 @@ class Bedrock extends AIProvider
 
     /** Timeout for single-shot completions; conversations use the request's own budget. */
     private const COMPLETE_TIMEOUT_SECONDS = 30;
+
+    /** Exact Bedrock model ID fragments that support reasoning_effort. */
+    private const GPT_OSS_MODEL_PATTERN = '/(?:^|[.\/])openai\.gpt-oss-(?:20b|120b)-1:0$/';
 
     public function __construct()
     {
@@ -127,6 +131,8 @@ class Bedrock extends AIProvider
             ],
         ];
 
+        $this->applyGptOssReasoningEffort($payload, $model, $request->getCapabilityLevel());
+
         $systemPrompt = $this->getSystemPrompt($request);
         if ($systemPrompt !== null && $systemPrompt !== '') {
             $payload['system'] = [
@@ -172,6 +178,8 @@ class Bedrock extends AIProvider
             ],
         ];
 
+        $this->applyGptOssReasoningEffort($payload, $model, $request->getCapabilityLevel());
+
         $systemPrompt = $request->getSystemPrompt();
         if ($systemPrompt !== null && $systemPrompt !== '') {
             $payload['system'] = [['text' => $systemPrompt]];
@@ -189,7 +197,10 @@ class Bedrock extends AIProvider
 
         return $this->buildConversationResponse(
             $model,
-            $this->bedrockContentToCanonical(is_array($rawContent) ? $rawContent : []),
+            $this->bedrockContentToCanonical(
+                is_array($rawContent) ? $rawContent : [],
+                $request->getCapabilityLevel() === Configuration::CAPABILITY_THINKING
+            ),
             $stopReason,
             isset($response['usage']['inputTokens']) ? (int) $response['usage']['inputTokens'] : null,
             isset($response['usage']['outputTokens']) ? (int) $response['usage']['outputTokens'] : null
@@ -424,6 +435,11 @@ class Bedrock extends AIProvider
             return ['text' => $block['text']];
         }
 
+        if ($type === 'reasoning') {
+            // Canonical reasoning is display-only and must never be replayed.
+            return null;
+        }
+
         if ($type === 'tool_use') {
             $id = $block['id'] ?? null;
             $name = $block['name'] ?? null;
@@ -535,11 +551,19 @@ class Bedrock extends AIProvider
      * @param list<mixed> $content Bedrock assistant content blocks
      * @return list<CanonicalContentBlockArray> canonical assistant content blocks
      */
-    private function bedrockContentToCanonical(array $content): array
+    private function bedrockContentToCanonical(array $content, bool $includeReasoning): array
     {
         $canonical = [];
         foreach ($content as $block) {
             if (!is_array($block)) {
+                continue;
+            }
+
+            if (is_array($block['reasoningContent'] ?? null)) {
+                $reasoningText = $this->bedrockReasoningText($block['reasoningContent']);
+                if ($includeReasoning && is_string($reasoningText) && trim($reasoningText) !== '') {
+                    $canonical[] = ['type' => 'reasoning', 'text' => $reasoningText];
+                }
                 continue;
             }
 
@@ -571,11 +595,44 @@ class Bedrock extends AIProvider
                 continue;
             }
 
-            // Unknown Bedrock block shapes (reasoningContent, etc.) are
-            // dropped until a canonical block type exists for them.
+            // Unknown Bedrock block shapes are dropped until a canonical
+            // block type exists for them.
         }
 
         return $canonical;
+    }
+
+    /**
+     * @param array<string, mixed> $reasoningContent
+     */
+    private function bedrockReasoningText(array $reasoningContent): ?string
+    {
+        $reasoningText = $reasoningContent['reasoningText'] ?? null;
+
+        return is_array($reasoningText) && is_string($reasoningText['text'] ?? null)
+            ? $reasoningText['text']
+            : null;
+    }
+
+    /**
+     * Adds the gpt-oss model-specific reasoning control without changing any
+     * other Bedrock model payload.
+     *
+     * @param array<string, mixed> $payload
+     */
+    private function applyGptOssReasoningEffort(array &$payload, string $model, ?string $capabilityLevel): void
+    {
+        if (!$this->isGptOssModel($model)) {
+            return;
+        }
+
+        $payload['additionalModelRequestFields']['reasoning_effort']
+            = $capabilityLevel === Configuration::CAPABILITY_THINKING ? 'medium' : 'low';
+    }
+
+    private function isGptOssModel(string $model): bool
+    {
+        return preg_match(self::GPT_OSS_MODEL_PATTERN, $model) === 1;
     }
 
     /**
