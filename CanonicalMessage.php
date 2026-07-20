@@ -36,6 +36,12 @@ namespace Piwik\Plugins\AIProviders;
  *   Text block (user or assistant):
  *     { type: 'text', text: string }
  *
+ *   Reasoning block (assistant only):
+ *     { type: 'reasoning', text: string }
+ *
+ *     Model reasoning surfaced separately from the answer. This block is
+ *     display-only and providers must not replay it to a model on later turns.
+ *
  *   Tool use block (assistant only):
  *     { type: 'tool_use', id: string, name: string, input: array<string, mixed> }
  *

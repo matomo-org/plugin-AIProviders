@@ -122,6 +122,11 @@ class AIProviderService
      */
     public function converse(AIConversationRequest $request): AIConversationResponse
     {
+        // Use the capability level set in the admin UI unless the request overrides it.
+        if ($request->getCapabilityLevel() === null) {
+            $request = $request->withCapabilityLevel($this->configuration->getDefaultCapabilityLevel());
+        }
+
         $providers = AIProviders::getAvailableProviders();
         $resolution = $this->resolveProviderId($request->getProviderId(), $request->getCallerPluginName(), $providers);
 

@@ -15,6 +15,7 @@ use PHPUnit\Framework\TestCase;
 use Piwik\Plugins\AIProviders\AIConversationRequest;
 use Piwik\Plugins\AIProviders\AIRequest;
 use Piwik\Plugins\AIProviders\Exception\AIProviderClientException;
+use Piwik\Plugins\AIProviders\Model\Configuration;
 use Piwik\Plugins\AIProviders\Provider\Bedrock;
 
 /**
@@ -91,6 +92,10 @@ class BedrockConverseTest extends TestCase
         $this->assertSame(
             ['maxTokens' => 32, 'temperature' => 0.2],
             $bedrock->sentPayload['inferenceConfig']
+        );
+        $this->assertSame(
+            ['reasoning_effort' => 'low'],
+            $bedrock->sentPayload['additionalModelRequestFields']
         );
         $this->assertSame('openai.gpt-oss-120b-1:0', $bedrock->sentModel);
         // Completions run with the provider's fixed timeout.
@@ -432,6 +437,97 @@ class BedrockConverseTest extends TestCase
         $this->assertSame(['json'], array_keys($spec['inputSchema']));
     }
 
+    /**
+     * Mistral Large only returns a structured toolUse block when a tool call is
+     * forced via toolChoice; under the default it leaks the call back as text.
+     * The provider forces `toolChoice: {any}` for this family only.
+     *
+     * @dataProvider getMistralLargeModelData
+     */
+    public function testMistralLargeForcesToolChoiceAny(string $model): void
+    {
+        $bedrock = new RecordingBedrock();
+
+        $bedrock->converse($this->toolRequestForModel($model), self::CONFIGURATION);
+
+        $toolConfig = $bedrock->sentPayload['toolConfig'];
+        $this->assertArrayHasKey('toolChoice', $toolConfig);
+        $this->assertEquals(['any' => new \stdClass()], $toolConfig['toolChoice']);
+
+        // The forced choice must serialise as an object (`{}`), not an empty
+        // array (`[]`); Bedrock rejects `"any":[]`.
+        $this->assertStringContainsString(
+            '"toolChoice":{"any":{}}',
+            (string) json_encode($bedrock->sentPayload)
+        );
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public function getMistralLargeModelData(): array
+    {
+        return [
+            'Large 2402' => ['mistral.mistral-large-2402-v1:0'],
+            'Large 2 (2407)' => ['mistral.mistral-large-2407-v1:0'],
+            'Large 3' => ['mistral.mistral-large-3-675b-instruct'],
+            'regional profile' => ['us.mistral.mistral-large-2402-v1:0'],
+            'inference-profile ARN' => [
+                'arn:aws:bedrock:us-east-1:123456789012:inference-profile/eu.mistral.mistral-large-2402-v1:0',
+            ],
+        ];
+    }
+
+    /**
+     * Every other family (including Magistral and the other Mistral tiers)
+     * returns structured tool use under the default toolChoice, so the provider
+     * must not force one on them.
+     *
+     * @dataProvider getNonMistralLargeModelData
+     */
+    public function testNonMistralLargeModelsDoNotForceToolChoice(string $model): void
+    {
+        $bedrock = new RecordingBedrock();
+
+        $bedrock->converse($this->toolRequestForModel($model), self::CONFIGURATION);
+
+        // The catalogue is still emitted; only the forced toolChoice is absent.
+        $this->assertArrayHasKey('toolConfig', $bedrock->sentPayload);
+        $this->assertArrayNotHasKey('toolChoice', $bedrock->sentPayload['toolConfig']);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public function getNonMistralLargeModelData(): array
+    {
+        return [
+            'Magistral' => ['mistral.magistral-small-2509'],
+            'Ministral 8B' => ['mistral.ministral-3-8b'],
+            'Ministral 3B' => ['mistral.ministral-3b'],
+            'Mistral Small' => ['mistral.mistral-small-2402-v1:0'],
+            'Mistral 7B' => ['mistral.mistral-7b-instruct-v0:2'],
+            'Claude' => ['anthropic.claude-3-7-sonnet-20250219-v1:0'],
+            'Nova' => ['amazon.nova-lite-v1:0'],
+            'gpt-oss' => ['openai.gpt-oss-120b-1:0'],
+            'embedded lookalike' => ['mymistral.mistral-large-2402-v1:0'],
+        ];
+    }
+
+    public function testMistralLargeWithoutToolsSendsNoToolConfig(): void
+    {
+        // toolChoice only rides along with a tool catalogue; a plain-chat turn
+        // to Mistral Large must not gain an empty toolConfig.
+        $bedrock = new RecordingBedrock();
+
+        $bedrock->converse(
+            $this->simpleRequest()->withModel('mistral.mistral-large-2402-v1:0'),
+            self::CONFIGURATION
+        );
+
+        $this->assertArrayNotHasKey('toolConfig', $bedrock->sentPayload);
+    }
+
     public function testResponseToolUseAndUnknownBlocksAreMappedToCanonical(): void
     {
         $bedrock = new RecordingBedrock();
@@ -450,12 +546,14 @@ class BedrockConverseTest extends TestCase
             'usage' => ['inputTokens' => 7, 'outputTokens' => 5],
         ];
 
-        $response = $bedrock->converse($this->simpleRequest(), self::CONFIGURATION);
+        $response = $bedrock->converse(
+            $this->simpleRequest()->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
 
-        // Unknown Bedrock block shapes (reasoningContent, …) are dropped;
-        // text and toolUse blocks come back in the canonical shape.
         $this->assertSame(
             [
+                ['type' => 'reasoning', 'text' => 'thinking …'],
                 ['type' => 'text', 'text' => 'Checking your sites now.'],
                 ['type' => 'tool_use', 'id' => 'tu_42', 'name' => 'matomo_demo', 'input' => ['idSite' => 1]],
             ],
@@ -703,12 +801,564 @@ class BedrockConverseTest extends TestCase
         );
     }
 
+    /**
+     * @dataProvider getGptOssReasoningEffortData
+     */
+    public function testGptOssMapsCapabilityToReasoningEffort(
+        string $method,
+        string $model,
+        string $capabilityLevel,
+        string $expectedEffort
+    ): void {
+        $bedrock = new RecordingBedrock();
+
+        if ($method === 'complete') {
+            $bedrock->complete(
+                (new AIRequest('hello', 'AskMatomo'))
+                    ->withModel($model)
+                    ->withCapabilityLevel($capabilityLevel),
+                self::CONFIGURATION
+            );
+        } else {
+            $bedrock->converse(
+                $this->simpleRequest()
+                    ->withModel($model)
+                    ->withCapabilityLevel($capabilityLevel),
+                self::CONFIGURATION
+            );
+        }
+
+        $this->assertSame(
+            ['reasoning_effort' => $expectedEffort],
+            $bedrock->sentPayload['additionalModelRequestFields']
+        );
+    }
+
+    public function getGptOssReasoningEffortData(): array
+    {
+        $cases = [];
+        foreach (['complete', 'converse'] as $method) {
+            foreach (['openai.gpt-oss-20b-1:0', 'openai.gpt-oss-120b-1:0'] as $model) {
+                $cases[$method . ' instant ' . $model] = [
+                    $method,
+                    $model,
+                    Configuration::CAPABILITY_INSTANT,
+                    'low',
+                ];
+                $cases[$method . ' thinking ' . $model] = [
+                    $method,
+                    $model,
+                    Configuration::CAPABILITY_THINKING,
+                    'medium',
+                ];
+            }
+        }
+
+        return $cases;
+    }
+
+    /**
+     * A per-request thinking budget overrides the capability level on the
+     * completion path (0 forces instant, >0 forces thinking), matching every
+     * other provider's wantsThinking() contract.
+     *
+     * @dataProvider getCompletionBudgetOverrideData
+     */
+    public function testCompletionThinkingBudgetOverridesCapabilityLevel(
+        string $capabilityLevel,
+        int $thinkingBudget,
+        string $expectedEffort
+    ): void {
+        $bedrock = new RecordingBedrock();
+
+        $bedrock->complete(
+            (new AIRequest('hello', 'AskMatomo'))
+                ->withModel('openai.gpt-oss-120b-1:0')
+                ->withCapabilityLevel($capabilityLevel)
+                ->withThinkingBudget($thinkingBudget),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame(
+            ['reasoning_effort' => $expectedEffort],
+            $bedrock->sentPayload['additionalModelRequestFields']
+        );
+    }
+
+    public function getCompletionBudgetOverrideData(): array
+    {
+        return [
+            'positive budget forces thinking despite instant' => [
+                Configuration::CAPABILITY_INSTANT,
+                4096,
+                'medium',
+            ],
+            'zero budget forces instant despite thinking' => [
+                Configuration::CAPABILITY_THINKING,
+                0,
+                'low',
+            ],
+        ];
+    }
+
+    /**
+     * @dataProvider getProfileAndArnModelData
+     */
+    public function testGptOssProfilesAndArnsAreRecognized(string $model): void
+    {
+        $bedrock = new RecordingBedrock();
+
+        $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel($model)
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame(
+            ['reasoning_effort' => 'medium'],
+            $bedrock->sentPayload['additionalModelRequestFields']
+        );
+    }
+
+    public function getProfileAndArnModelData(): array
+    {
+        return [
+            'regional profile' => ['us.openai.gpt-oss-20b-1:0'],
+            'foundation model ARN' => [
+                'arn:aws:bedrock:us-east-1::foundation-model/openai.gpt-oss-120b-1:0',
+            ],
+            'regional profile ARN' => [
+                'arn:aws:bedrock:eu-west-1:123456789012:inference-profile/eu.openai.gpt-oss-20b-1:0',
+            ],
+        ];
+    }
+
+    /**
+     * @dataProvider getNovaReasoningConfigData
+     */
+    public function testNovaMapsCapabilityToReasoningConfig(
+        string $method,
+        string $model,
+        string $capabilityLevel,
+        array $expectedConfig
+    ): void {
+        $bedrock = new RecordingBedrock();
+
+        if ($method === 'complete') {
+            $bedrock->complete(
+                (new AIRequest('hello', 'AskMatomo'))
+                    ->withModel($model)
+                    ->withCapabilityLevel($capabilityLevel),
+                self::CONFIGURATION
+            );
+        } else {
+            $bedrock->converse(
+                $this->simpleRequest()
+                    ->withModel($model)
+                    ->withCapabilityLevel($capabilityLevel),
+                self::CONFIGURATION
+            );
+        }
+
+        $this->assertSame(
+            ['reasoningConfig' => $expectedConfig],
+            $bedrock->sentPayload['additionalModelRequestFields']
+        );
+    }
+
+    public function getNovaReasoningConfigData(): array
+    {
+        $cases = [];
+        foreach (['complete', 'converse'] as $method) {
+            foreach (['amazon.nova-2-lite-v1:0'] as $model) {
+                $cases[$method . ' instant ' . $model] = [
+                    $method,
+                    $model,
+                    Configuration::CAPABILITY_INSTANT,
+                    ['type' => 'disabled'],
+                ];
+                $cases[$method . ' thinking ' . $model] = [
+                    $method,
+                    $model,
+                    Configuration::CAPABILITY_THINKING,
+                    ['type' => 'enabled', 'maxReasoningEffort' => 'medium'],
+                ];
+            }
+        }
+
+        return $cases;
+    }
+
+    /**
+     * @dataProvider getNovaReasoningProfileAndArnModelData
+     */
+    public function testNovaReasoningProfilesAndArnsAreRecognized(string $model): void
+    {
+        $bedrock = new RecordingBedrock();
+
+        $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel($model)
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame(
+            ['reasoningConfig' => ['type' => 'enabled', 'maxReasoningEffort' => 'medium']],
+            $bedrock->sentPayload['additionalModelRequestFields']
+        );
+    }
+
+    public function getNovaReasoningProfileAndArnModelData(): array
+    {
+        return [
+            'Nova 2 regional profile' => ['eu.amazon.nova-2-lite-v1:0'],
+            'Nova 2 inference-profile ARN' => [
+                'arn:aws:bedrock:us-east-1:123456789012:inference-profile/amazon.nova-2-lite-v1:0',
+            ],
+        ];
+    }
+
+    /**
+     * @dataProvider getNonGptOssModelData
+     */
+    public function testOtherModelsLeaveReasoningFieldsOutOfBothPayloads(string $model): void
+    {
+        $bedrock = new RecordingBedrock();
+
+        $bedrock->complete(
+            (new AIRequest('hello', 'AskMatomo'))
+                ->withModel($model)
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+        $this->assertArrayNotHasKey('additionalModelRequestFields', $bedrock->sentPayload);
+
+        $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel($model)
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+        $this->assertArrayNotHasKey('additionalModelRequestFields', $bedrock->sentPayload);
+    }
+
+    public function getNonGptOssModelData(): array
+    {
+        return [
+            'Claude' => ['anthropic.claude-3-7-sonnet-20250219-v1:0'],
+            'Nova' => ['amazon.nova-lite-v1:0'],
+            'other OpenAI model' => ['openai.gpt-4o'],
+            'other gpt-oss size' => ['openai.gpt-oss-7b-1:0'],
+            'embedded lookalike' => ['myopenai.gpt-oss-120b-1:0'],
+            'suffixed lookalike' => ['openai.gpt-oss-120b-1:0-extra'],
+        ];
+    }
+
+    public function testStructuredReasoningIsHiddenForInstantRequests(): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [
+                ['reasoningContent' => ['reasoningText' => ['text' => 'internal thoughts']]],
+                ['text' => 'Here is the answer.'],
+            ]]],
+            'stopReason' => 'end_turn',
+        ];
+
+        $response = $bedrock->converse(
+            $this->simpleRequest()->withCapabilityLevel(Configuration::CAPABILITY_INSTANT),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame([['type' => 'text', 'text' => 'Here is the answer.']], $response->getContent());
+    }
+
+    public function getRedactedReasoningPlaceholderData(): array
+    {
+        return [
+            'bare' => ['[REDACTED]'],
+            'trailing period' => ['[REDACTED].'],
+            'surrounding whitespace' => ['  [REDACTED]  '],
+        ];
+    }
+
+    /**
+     * Nova 2 does not expose its reasoning text yet: it returns the literal
+     * "[REDACTED]" placeholder, which must never be surfaced as reasoning.
+     *
+     * @dataProvider getRedactedReasoningPlaceholderData
+     */
+    public function testRedactedReasoningPlaceholderIsNotSurfaced(string $placeholder): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [
+                ['reasoningContent' => ['reasoningText' => ['text' => $placeholder]]],
+                ['toolUse' => ['toolUseId' => 'tu_1', 'name' => 'matomo_site_get', 'input' => ['idSite' => 1]]],
+            ]]],
+            'stopReason' => 'tool_use',
+        ];
+
+        $response = $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel('amazon.nova-2-lite-v1:0')
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame(
+            [['type' => 'tool_use', 'id' => 'tu_1', 'name' => 'matomo_site_get', 'input' => ['idSite' => 1]]],
+            $response->getContent()
+        );
+    }
+
+    public function testGenuineStructuredReasoningTextIsStillSurfaced(): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [
+                ['reasoningContent' => ['reasoningText' => ['text' => 'Genuine step-by-step reasoning.']]],
+                ['text' => 'Answer.'],
+            ]]],
+            'stopReason' => 'end_turn',
+        ];
+
+        $response = $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel('amazon.nova-2-lite-v1:0')
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame(
+            [
+                ['type' => 'reasoning', 'text' => 'Genuine step-by-step reasoning.'],
+                ['type' => 'text', 'text' => 'Answer.'],
+            ],
+            $response->getContent()
+        );
+    }
+
+    public function getNovaGen1InlineReasoningTagData(): array
+    {
+        return [
+            'reasoning' => ['reasoning'],
+            'think' => ['think'],
+            'thinking' => ['thinking'],
+        ];
+    }
+
+    /**
+     * Nova gen-1 models have no structured reasoningContent; they emit their
+     * chain-of-thought as inline <thinking> tags at the start of the answer,
+     * which must be split into a separate reasoning block.
+     *
+     * @dataProvider getNovaGen1InlineReasoningTagData
+     */
+    public function testNovaGen1LeadingReasoningIsExposedForThinkingRequests(string $tag): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [[
+                'text' => sprintf('<%1$s>internal thoughts</%1$s>Here is the answer.', $tag),
+            ]]]],
+            'stopReason' => 'end_turn',
+        ];
+
+        $response = $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel('amazon.nova-lite-v1:0')
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame(
+            [
+                ['type' => 'reasoning', 'text' => 'internal thoughts'],
+                ['type' => 'text', 'text' => 'Here is the answer.'],
+            ],
+            $response->getContent()
+        );
+    }
+
+    public function testNovaGen1LeadingReasoningIsRemovedForInstantRequests(): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [[
+                'text' => '<thinking>internal thoughts</thinking>Here is the answer.',
+            ]]]],
+            'stopReason' => 'end_turn',
+        ];
+
+        $response = $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel('amazon.nova-lite-v1:0')
+                ->withCapabilityLevel(Configuration::CAPABILITY_INSTANT),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame([['type' => 'text', 'text' => 'Here is the answer.']], $response->getContent());
+    }
+
+    public function testNovaGen1MalformedLeadingReasoningRemainsAnswerText(): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [['text' => '<thinking>unfinished answer']]]],
+            'stopReason' => 'max_tokens',
+        ];
+
+        $response = $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel('amazon.nova-lite-v1:0')
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame(
+            [['type' => 'text', 'text' => '<thinking>unfinished answer']],
+            $response->getContent()
+        );
+    }
+
+    public function getStructuredReasoningModelData(): array
+    {
+        return [
+            // gpt-oss and Nova 2 surface reasoning as structured
+            // reasoningContent, so a leading <thinking> tag in their text is a
+            // genuine answer, not reasoning, and must not be split out.
+            'gpt-oss' => ['openai.gpt-oss-120b-1:0'],
+            'Nova 2 lite' => ['amazon.nova-2-lite-v1:0'],
+            'Claude' => ['anthropic.claude-3-7-sonnet-20250219-v1:0'],
+            'gen-1 lookalike' => ['myamazon.nova-lite-v1:0'],
+        ];
+    }
+
+    /**
+     * @dataProvider getStructuredReasoningModelData
+     */
+    public function testModelsWithoutInlineReasoningKeepTagsUnchanged(string $model): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [[
+                'text' => '<thinking>ordinary answer text</thinking>Still answer text.',
+            ]]]],
+            'stopReason' => 'end_turn',
+        ];
+
+        $response = $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel($model)
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame(
+            [['type' => 'text', 'text' => '<thinking>ordinary answer text</thinking>Still answer text.']],
+            $response->getContent()
+        );
+    }
+
+    public function getNovaGen1ProfileAndArnModelData(): array
+    {
+        return [
+            'plain' => ['amazon.nova-lite-v1:0'],
+            'region profile' => ['us.amazon.nova-lite-v1:0'],
+            'micro tier' => ['amazon.nova-micro-v1:0'],
+            'arn' => ['arn:aws:bedrock:us-east-1:123:inference-profile/amazon.nova-pro-v1:0'],
+        ];
+    }
+
+    /**
+     * @dataProvider getNovaGen1ProfileAndArnModelData
+     */
+    public function testNovaGen1InlineReasoningIsSplitAcrossProfilesAndArns(string $model): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [[
+                'text' => '<thinking>internal thoughts</thinking>Here is the answer.',
+            ]]]],
+            'stopReason' => 'end_turn',
+        ];
+
+        $response = $bedrock->converse(
+            $this->simpleRequest()
+                ->withModel($model)
+                ->withCapabilityLevel(Configuration::CAPABILITY_THINKING),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame(
+            [
+                ['type' => 'reasoning', 'text' => 'internal thoughts'],
+                ['type' => 'text', 'text' => 'Here is the answer.'],
+            ],
+            $response->getContent()
+        );
+    }
+
+    public function testCompleteStripsNovaGen1LeadingReasoning(): void
+    {
+        $bedrock = new RecordingBedrock();
+        $bedrock->cannedResponse = [
+            'output' => ['message' => ['content' => [[
+                'text' => '<reasoning>internal thoughts</reasoning>Visible answer.',
+            ]]]],
+            'stopReason' => 'end_turn',
+        ];
+
+        $response = $bedrock->complete(
+            (new AIRequest('hello', 'AskMatomo'))
+                ->withModel('amazon.nova-lite-v1:0')
+                ->withCapabilityLevel(Configuration::CAPABILITY_INSTANT),
+            self::CONFIGURATION
+        );
+
+        $this->assertSame('Visible answer.', $response->getText());
+    }
+
+    public function testCanonicalReasoningIsNotReplayed(): void
+    {
+        $bedrock = new RecordingBedrock();
+        $request = new AIConversationRequest([
+            ['role' => 'assistant', 'content' => [
+                ['type' => 'reasoning', 'text' => 'internal thoughts'],
+                ['type' => 'text', 'text' => 'Visible answer.'],
+            ]],
+        ], 'AskMatomo');
+
+        $bedrock->converse($request, self::CONFIGURATION);
+
+        $this->assertSame(
+            [['role' => 'assistant', 'content' => [['text' => 'Visible answer.']]]],
+            $bedrock->sentPayload['messages']
+        );
+    }
+
     private function simpleRequest(): AIConversationRequest
     {
         return new AIConversationRequest(
             [['role' => 'user', 'content' => [['type' => 'text', 'text' => 'hello']]]],
             'AskMatomo'
         );
+    }
+
+    private function toolRequestForModel(string $model): AIConversationRequest
+    {
+        return $this->simpleRequest()
+            ->withModel($model)
+            ->withTools([
+                [
+                    'name' => 'matomo_site_list',
+                    'description' => 'Lists sites',
+                    'inputSchema' => ['type' => 'object'],
+                ],
+            ]);
     }
 }
 
