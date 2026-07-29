@@ -102,6 +102,7 @@ class AIProviders extends Plugin
         $translations[] = 'AIProviders_ClickTestConnectionToShowAvailableModels';
         $translations[] = 'AIProviders_ConfigurationIntro';
         $translations[] = 'AIProviders_CustomProviderDescription';
+        $translations[] = 'AIProviders_DataConsentIncluded';
         $translations[] = 'AIProviders_DefaultBadge';
         $translations[] = 'AIProviders_DefaultCapabilityLevel';
         $translations[] = 'AIProviders_DefaultCapabilityLevelHelp';
