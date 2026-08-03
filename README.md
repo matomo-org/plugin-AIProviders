@@ -41,11 +41,20 @@ AIProviders.openaiApiKey
 
 ```ini
 [AIProviders]
-openaiApiKey = "..."       ; or env MATOMO_AIPROVIDERS_OPENAI_API_KEY
-openaiEndpointUrl = "..."  ; or env MATOMO_AIPROVIDERS_OPENAI_ENDPOINT_URL
+openaiApiKey = "..."                ; or env MATOMO_AIPROVIDERS_OPENAI_API_KEY
+custom-providerApiKey = "..."       ; or env MATOMO_AIPROVIDERS_CUSTOM_PROVIDER_API_KEY
+custom-providerEndpointUrl = "..."  ; or env MATOMO_AIPROVIDERS_CUSTOM_PROVIDER_ENDPOINT_URL
 ```
 
+`<provider>EndpointUrl` only applies to the providers that have an endpoint field at all — the custom provider's base URL and AWS Bedrock's region. The fixed hosted providers (OpenAI, Anthropic, Google) always talk to their own API, so a value supplied for them is ignored.
+
 Credentials supplied this way never appear in the UI as secret values and cannot be edited or removed there.
+
+A managed API key is bound to the endpoint it belongs to. For a provider whose endpoint field is a free-form URL (the custom provider), supply `<provider>EndpointUrl` together with `<provider>ApiKey`: such a key is only ever sent to the endpoint supplied alongside it, and an endpoint stored on the instance is ignored. Without a managed endpoint the provider has no destination and reports as not connected, so do not set `<provider>ApiKey` for a provider whose endpoint the instance should choose itself.
+
+Saving or testing a different endpoint is then rejected with an error naming the config key to set instead. Only the endpoint is bound this way, not the key: a connection test may still submit an API key of its own, which is then the one sent to the managed endpoint. Providers that expand the field into a host they control, such as AWS Bedrock with its region, are unaffected by the *key* binding.
+
+Supplying `<provider>EndpointUrl` on its own — without an API key — locks the endpoint field the same way, for the custom provider and for Bedrock's region alike: the supplied value is the one used, and saving or testing a different one is rejected rather than silently discarded, so a connection test can never report a pairing that a save would refuse to store. An endpoint the instance had configured before stays in the database untouched and takes effect again once the supplied value is removed.
 
 In a multi-tenant setup the `config.ini.php` is scoped to each tenant, so the `[AIProviders]` section is the natural place to give each tenant its own provider credentials and forced default. Environment variables are process-wide and shared across tenants, so prefer the config file when the value must differ per tenant.
 

@@ -119,6 +119,11 @@ class Bedrock extends AIProvider
         return 'AIProviders_BedrockEndpointPlaceholder';
     }
 
+    public function getEndpointFieldErrorMessage(): string
+    {
+        return 'AIProviders_ErrorInvalidAwsRegion';
+    }
+
     public function supportsFipsEndpoint(): bool
     {
         return true;

@@ -114,6 +114,15 @@ abstract class AIProvider
         return false;
     }
 
+    /**
+     * Returns whether the endpoint field is the request URL itself, and can
+     * therefore name any host. Return false only when the field is expanded into
+     * a host the provider controls, the way a region is (see Bedrock).
+     *
+     * This decides whether a centrally managed API key may be paired with an
+     * endpoint configured on the instance, so a provider whose field does reach
+     * the request URL must not return false.
+     */
     public function endpointFieldRequiresUrl(): bool
     {
         return true;
@@ -144,6 +153,17 @@ abstract class AIProvider
     public function getEndpointFieldPlaceholder(): string
     {
         return 'AIProviders_EndpointUrlPlaceholder';
+    }
+
+    /**
+     * Translation key for the error shown when the settings form rejects the
+     * endpoint field's value. Takes the provider name as its only argument.
+     * Providers whose field is not a URL override this to name what they do
+     * expect, the way they already override the field's label.
+     */
+    public function getEndpointFieldErrorMessage(): string
+    {
+        return 'AIProviders_ErrorInvalidEndpointUrl';
     }
 
     public function getDefaultModel(): string

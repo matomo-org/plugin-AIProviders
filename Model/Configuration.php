@@ -14,6 +14,7 @@ namespace Piwik\Plugins\AIProviders\Model;
 use InvalidArgumentException;
 use Piwik\Config;
 use Piwik\Container\StaticContainer;
+use Piwik\Piwik;
 use Piwik\Settings\FieldConfig;
 use Piwik\Settings\Plugin\SystemSetting;
 use Piwik\Plugins\AIProviders\AIProvidersList;
@@ -32,13 +33,29 @@ use Piwik\Plugins\AIProviders\Provider\AIProvider;
  * 2. The `[AIProviders]` section of `config.ini.php`, or environment variables:
  *
  *        [AIProviders]
- *        openaiApiKey = "..."       ; or env MATOMO_AIPROVIDERS_OPENAI_API_KEY
- *        openaiEndpointUrl = "..."       ; or env MATOMO_AIPROVIDERS_OPENAI_ENDPOINT_URL
- *        bedrockUseFipsEndpoint = "1"    ; or env MATOMO_AIPROVIDERS_BEDROCK_USE_FIPS_ENDPOINT
+ *        openaiApiKey = "..."                ; or env MATOMO_AIPROVIDERS_OPENAI_API_KEY
+ *        custom-providerEndpointUrl = "..."  ; or env MATOMO_AIPROVIDERS_CUSTOM_PROVIDER_ENDPOINT_URL
+ *        bedrockUseFipsEndpoint = "1"        ; or env MATOMO_AIPROVIDERS_BEDROCK_USE_FIPS_ENDPOINT
+ *
+ * An endpoint is only read for the providers that have an endpoint field (see
+ * {@link AIProvider::supportsCustomEndpoint()}); the fixed hosted providers
+ * ignore one supplied for them.
  *
  * 3. The database, written from the administration UI.
  *
  * The DI/config-file sources are how a managed environment supplies credentials.
+ * A centrally supplied API key also decides the endpoint it may be sent to: for
+ * a provider whose endpoint field is the request URL, neither a stored nor a
+ * submitted endpoint is ever paired with such a key, so a superuser cannot
+ * redirect it. Providers that expand the field into a host they control are
+ * exempt, for example AWS Bedrock with its region (see
+ * {@link AIProvider::endpointFieldRequiresUrl()}). Either way, an endpoint the
+ * central sources decide cannot be changed from the settings form (see
+ * {@link isEndpointUrlSuppliedCentrally()}).
+ *
+ * Errors that reject a value the admin submitted from the settings form are
+ * translated (the `AIProviders_Error*` keys); everything the form cannot
+ * produce stays in English.
  */
 class Configuration
 {
@@ -133,7 +150,7 @@ class Configuration
             'canEditCapabilityLevel' => $this->canEditCapabilityLevel(),
             'capabilityLevels' => $this->getCapabilityLevels(),
             'providers' => array_map(function (AIProvider $provider): array {
-                $providerConfiguration = $this->getProviderConfiguration($provider->getId());
+                $providerConfiguration = $this->getProviderConfiguration($provider);
 
                 return array_merge($provider->toArray(), [
                     'configuration' => [
@@ -188,8 +205,9 @@ class Configuration
      * @internal
      * @return array{apiKey: string, endpointUrl: string, model: string, useFipsEndpoint: bool}
      */
-    public function getProviderConfiguration(string $providerId): array
+    public function getProviderConfiguration(AIProvider $provider): array
     {
+        $providerId = $provider->getId();
         $storedConfiguration = $this->getProviderConfigurations()[$providerId] ?? [
             'apiKey' => '',
             'endpointUrl' => '',
@@ -202,9 +220,11 @@ class Configuration
             'apiKey' => $configFileConfiguration['apiKey'] !== ''
                 ? $configFileConfiguration['apiKey']
                 : $storedConfiguration['apiKey'],
-            'endpointUrl' => $configFileConfiguration['endpointUrl'] !== ''
-                ? $configFileConfiguration['endpointUrl']
-                : $storedConfiguration['endpointUrl'],
+            'endpointUrl' => $this->resolveEndpointUrl(
+                $provider,
+                $configFileConfiguration,
+                $storedConfiguration
+            ),
             'model' => $configFileConfiguration['model'] !== ''
                 ? $configFileConfiguration['model']
                 : $storedConfiguration['model'],
@@ -212,6 +232,39 @@ class Configuration
                 ? $configFileConfiguration['useFipsEndpoint']
                 : $storedConfiguration['useFipsEndpoint'],
         ];
+    }
+
+    /**
+     * @param array{apiKey: string, endpointUrl: string, model: string, useFipsEndpoint: bool|null} $configFileConfiguration
+     * @param array{apiKey: string, endpointUrl: string, model: string, useFipsEndpoint: bool} $storedConfiguration
+     */
+    private function resolveEndpointUrl(
+        AIProvider $provider,
+        #[\SensitiveParameter]
+        array $configFileConfiguration,
+        #[\SensitiveParameter]
+        array $storedConfiguration
+    ): string {
+        if (!$provider->supportsCustomEndpoint()) {
+            return '';
+        }
+
+        if ($configFileConfiguration['endpointUrl'] !== '') {
+            return $configFileConfiguration['endpointUrl'];
+        }
+
+        if ($this->isEndpointUrlPinnedBySuppliedApiKey($provider)) {
+            return '';
+        }
+
+        return $storedConfiguration['endpointUrl'];
+    }
+
+    private function isEndpointUrlPinnedBySuppliedApiKey(AIProvider $provider): bool
+    {
+        return $this->getConfigFileProviderConfiguration($provider->getId())['apiKey'] !== ''
+            && $provider->supportsCustomEndpoint()
+            && $provider->endpointFieldRequiresUrl();
     }
 
     /**
@@ -227,10 +280,20 @@ class Configuration
         array $submittedProviderConfiguration = []
     ): array {
         $providerId = $provider->getId();
+
+        // Checked against the submitted values before the merge below fills the
+        // endpoint in from the effective configuration.
+        $this->checkSubmittedEndpointUrlIsAllowed(
+            $provider,
+            $submittedProviderConfiguration,
+            $this->getSubmittedEndpointUrl($submittedProviderConfiguration, $provider)
+        );
+
         // Base the merge on the effective configuration so a connection test
         // exercises what complete() would actually use, including config-file
-        // credentials.
-        $existingConfiguration = $this->getProviderConfiguration($providerId);
+        // credentials. Only an omitted or matching endpoint survives the check
+        // above.
+        $existingConfiguration = $this->getProviderConfiguration($provider);
         $submittedProviderConfiguration = array_merge(
             $existingConfiguration,
             $submittedProviderConfiguration
@@ -367,12 +430,18 @@ class Configuration
 
         // Restricted providers are reported as unknown on purpose: admin
         // surfaces must not reveal that they exist.
-        if (!$providers->hasProvider($providerId) || !$providers->isSelectable($providerId)) {
-            throw new InvalidArgumentException(sprintf('Unknown AI provider "%s".', $providerId));
+        $provider = $providers->getProvider($providerId);
+
+        if ($provider === null || !$providers->isSelectable($providerId)) {
+            throw new InvalidArgumentException(
+                Piwik::translate('AIProviders_ErrorUnknownProvider', $providerId)
+            );
         }
 
-        if (!$this->isProviderUsable($providers->getProvider($providerId))) {
-            throw new InvalidArgumentException(sprintf('AI provider "%s" is not configured.', $providerId));
+        if (!$this->isProviderUsable($provider)) {
+            throw new InvalidArgumentException(
+                Piwik::translate('AIProviders_ErrorProviderNotConfigured', $provider->getName())
+            );
         }
 
         $this->defaultProvider->setValue($providerId);
@@ -398,7 +467,9 @@ class Configuration
         $capabilityLevel = trim($capabilityLevel);
 
         if (!array_key_exists($capabilityLevel, $this->getCapabilityLevels())) {
-            throw new InvalidArgumentException(sprintf('Unknown AI model capability level "%s".', $capabilityLevel));
+            throw new InvalidArgumentException(
+                Piwik::translate('AIProviders_ErrorUnknownCapabilityLevel', $capabilityLevel)
+            );
         }
 
         $this->defaultCapabilityLevel->setValue($capabilityLevel);
@@ -473,7 +544,9 @@ class Configuration
      * Only selectable providers are accepted, so restricted providers cannot
      * be configured through the administration flow. The API key fallback
      * reads the stored (database) value on purpose: config-file credentials
-     * must never be copied into the database.
+     * must never be copied into the database. The endpoint is kept out of it
+     * the same way while a supplied key pins it (see
+     * {@link getEndpointUrlToStore()}).
      *
      * @param array<string, mixed> $submittedProviderConfigurations
      */
@@ -495,10 +568,16 @@ class Configuration
 
             $apiKey = $this->getSubmittedApiKey($submittedProviderConfiguration, $existingProviderConfigurations, $providerId);
             $endpointUrl = $this->getSubmittedEndpointUrl($submittedProviderConfiguration, $provider);
+            $this->checkSubmittedEndpointUrlIsAllowed($provider, $submittedProviderConfiguration, $endpointUrl);
+            $endpointUrl = $this->getEndpointUrlToStore($provider, $endpointUrl, $existingProviderConfigurations);
             $model = $this->getSubmittedModel($submittedProviderConfiguration, $provider);
             $useFipsEndpoint = $this->getSubmittedUseFipsEndpoint($submittedProviderConfiguration, $provider);
 
-            if ($apiKey === '' && $endpointUrl === '' && !$useFipsEndpoint) {
+            // The model counts on its own: when the credentials and the endpoint
+            // are supplied centrally, neither is stored (see
+            // getEndpointUrlToStore()), and dropping the entry would discard the
+            // model the admin picked and leave the provider unable to run.
+            if ($apiKey === '' && $endpointUrl === '' && $model === '' && !$useFipsEndpoint) {
                 continue;
             }
 
@@ -515,6 +594,112 @@ class Configuration
     }
 
     /**
+     * Rejects a submitted endpoint that the central sources decide instead.
+     *
+     * Only a value that actually differs from the effective one is rejected: the
+     * admin form prefills the endpoint field and resubmits it unchanged on every
+     * save, and a caller may omit the field entirely. Rejecting rather than
+     * silently dropping the value keeps the save and connection-test paths
+     * agreeing on what a connection can be, so a test cannot report a pairing a
+     * save would refuse to store.
+     *
+     * @param array<string, mixed> $submittedProviderConfiguration
+     */
+    private function checkSubmittedEndpointUrlIsAllowed(
+        AIProvider $provider,
+        #[\SensitiveParameter]
+        array $submittedProviderConfiguration,
+        string $endpointUrl
+    ): void {
+        if (
+            !array_key_exists('endpointUrl', $submittedProviderConfiguration)
+            || !$this->isEndpointUrlSuppliedCentrally($provider)
+            || $endpointUrl === $this->getEffectiveEndpointUrl($provider)
+        ) {
+            return;
+        }
+
+        // Getting here without a supplied endpoint means a supplied API key is
+        // what decides it, the one case where the admin has to be told to add the
+        // endpoint rather than to look up the value already in place.
+        $messageKey = $this->getConfigFileProviderConfiguration($provider->getId())['endpointUrl'] === ''
+            ? 'AIProviders_ErrorEndpointUrlManagedWithApiKey'
+            : 'AIProviders_ErrorEndpointManaged';
+
+        throw new InvalidArgumentException(Piwik::translate(
+            $messageKey,
+            [$provider->getName(), $provider->getId() . 'EndpointUrl']
+        ));
+    }
+
+    /**
+     * Returns the effective endpoint normalized the way a submitted one is (see
+     * {@link getSubmittedEndpointUrl()}), so both are compared as the request
+     * URL they produce. A value the provider rejects has no such URL, so it is
+     * left as it is and matches nothing.
+     */
+    private function getEffectiveEndpointUrl(AIProvider $provider): string
+    {
+        $endpointUrl = $this->getProviderConfiguration($provider)['endpointUrl'];
+
+        try {
+            return $provider->normalizeEndpointUrl($endpointUrl);
+        } catch (AIProviderClientException $e) {
+            return $endpointUrl;
+        }
+    }
+
+    /**
+     * Returns the endpoint URL to persist, keeping the stored one untouched
+     * while the effective endpoint comes from the central sources.
+     *
+     * The form posts the effective value back on every save, and neither half of
+     * it belongs in the database: storing the empty one would erase the endpoint
+     * the instance had configured before, and storing the supplied one would copy
+     * central configuration into the database, where it would outlive its
+     * removal.
+     *
+     * @param array<string, array{apiKey: string, endpointUrl: string, model: string, useFipsEndpoint: bool}> $existingProviderConfigurations
+     */
+    private function getEndpointUrlToStore(
+        AIProvider $provider,
+        string $endpointUrl,
+        #[\SensitiveParameter]
+        array $existingProviderConfigurations
+    ): string {
+        if (!$this->isEndpointUrlSuppliedCentrally($provider)) {
+            return $endpointUrl;
+        }
+
+        return $existingProviderConfigurations[$provider->getId()]['endpointUrl'] ?? '';
+    }
+
+    /**
+     * Returns whether the endpoint the provider is called with is decided by the
+     * DI/config-file sources rather than the database, either because one was
+     * supplied there or because a supplied API key pins it. A submitted endpoint
+     * can neither take effect nor be persisted in that case: it would sit
+     * shadowed in the database and then silently take over the moment the central
+     * value is removed.
+     *
+     * Providers without an endpoint field are never affected, so a value supplied
+     * for one of them stays ignored rather than locking their settings.
+     */
+    private function isEndpointUrlSuppliedCentrally(AIProvider $provider): bool
+    {
+        if (!$provider->supportsCustomEndpoint()) {
+            return false;
+        }
+
+        return $this->getConfigFileProviderConfiguration($provider->getId())['endpointUrl'] !== ''
+            || $this->isEndpointUrlPinnedBySuppliedApiKey($provider);
+    }
+
+    /**
+     * An empty API key means "keep the existing one": the UI cannot prefill a
+     * write-only field, so it always submits an empty value unless the admin
+     * typed a new key.
+     *
      * @param array<string, mixed> $submittedProviderConfiguration
      * @param array<string, array{apiKey: string, endpointUrl: string, model: string, useFipsEndpoint: bool}> $existingProviderConfigurations
      */
@@ -525,15 +710,23 @@ class Configuration
         array $existingProviderConfigurations,
         string $providerId
     ): string {
-        if (
-            isset($submittedProviderConfiguration['apiKey'])
-            && is_string($submittedProviderConfiguration['apiKey'])
-            && trim($submittedProviderConfiguration['apiKey']) !== ''
-        ) {
-            return trim($submittedProviderConfiguration['apiKey']);
+        if ($this->hasSubmittedApiKey($submittedProviderConfiguration)) {
+            return trim((string) $submittedProviderConfiguration['apiKey']);
         }
 
         return $existingProviderConfigurations[$providerId]['apiKey'] ?? '';
+    }
+
+    /**
+     * @param array<string, mixed> $submittedProviderConfiguration
+     */
+    private function hasSubmittedApiKey(
+        #[\SensitiveParameter]
+        array $submittedProviderConfiguration
+    ): bool {
+        return isset($submittedProviderConfiguration['apiKey'])
+            && is_string($submittedProviderConfiguration['apiKey'])
+            && trim($submittedProviderConfiguration['apiKey']) !== '';
     }
 
     /**
@@ -557,7 +750,10 @@ class Configuration
         try {
             $endpointUrl = $provider->normalizeEndpointUrl($endpointUrl);
         } catch (AIProviderClientException $e) {
-            throw new InvalidArgumentException($e->getMessage(), 0, $e);
+            // The provider's own message stays English for the request-time
+            // callers it shares; the admin reads the translated wording and the
+            // original as the cause.
+            throw $this->invalidEndpointFieldException($provider, $e);
         }
 
         if (!$provider->endpointFieldRequiresUrl()) {
@@ -571,13 +767,26 @@ class Configuration
             !filter_var($endpointUrl, FILTER_VALIDATE_URL)
             || !in_array($scheme, ['http', 'https'], true)
         ) {
-            throw new InvalidArgumentException(sprintf(
-                'Invalid endpoint URL for AI provider "%s".',
-                $provider->getId()
-            ));
+            throw $this->invalidEndpointFieldException($provider);
         }
 
         return $endpointUrl;
+    }
+
+    /**
+     * Both rejection paths in {@link getSubmittedEndpointUrl()} share this, so a
+     * provider that only accepts shorthand states its wording once, on
+     * {@link AIProvider::getEndpointFieldErrorMessage()}.
+     */
+    private function invalidEndpointFieldException(
+        AIProvider $provider,
+        ?AIProviderClientException $cause = null
+    ): InvalidArgumentException {
+        return new InvalidArgumentException(
+            Piwik::translate($provider->getEndpointFieldErrorMessage(), $provider->getName()),
+            0,
+            $cause
+        );
     }
 
     /**
@@ -629,7 +838,7 @@ class Configuration
             return false;
         }
 
-        return $provider->isConfigured($this->getProviderConfiguration($provider->getId()));
+        return $provider->isConfigured($this->getProviderConfiguration($provider));
     }
 
     /**

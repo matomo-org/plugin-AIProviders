@@ -162,7 +162,9 @@ class API extends PluginAPI
         $provider = $providers->getProvider($providerId);
 
         if ($provider === null || !$providers->isSelectable($providerId)) {
-            throw new \InvalidArgumentException(sprintf('Unknown AI provider "%s".', $providerId));
+            throw new \InvalidArgumentException(
+                Piwik::translate('AIProviders_ErrorUnknownProvider', $providerId)
+            );
         }
 
         return $provider;
