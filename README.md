@@ -71,6 +71,23 @@ providerSelectionAllowlist[] = "ExamplePlugin"
 ```
 
 
+## Consent
+
+A super user gives the AI data processing consent once for the whole instance under **Administration > General settings > AI data processing**, as a checklist of cumulative tiers: ticking one ticks and locks the less sensitive ones below it, unticking the highest one steps down a tier. The stored value is the highest ticked tier, one of `none` (default), `general`, `aggregated`, `raw` (see `AIDataScope`).
+
+Changes are recorded by ActivityLog. Unlike the provider settings, the consent cannot be supplied or locked by the hosting environment: a `[AIProviders] dataConsent` config entry is ignored and the field stays editable, because granting consent is the account owner's decision, including on Matomo Cloud.
+
+This plugin only stores and reports the consent. **Acting on it is the consuming feature's job**, since only the feature knows what it sends: `complete()`, `converse()` and `canConverse()` do not check it.
+
+```php
+use Piwik\Plugins\AIProviders\AIDataScope;
+
+// widest category this feature sends; needs no access rights, so it also gates UI
+if (!$service->hasConsentFor(AIDataScope::AGGREGATED)) {
+    return;
+}
+```
+
 ## Usage from other plugins
 
 To use a provider from another plugin, call the AIProvider service like so:

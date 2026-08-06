@@ -117,6 +117,13 @@ module.exports = __WEBPACK_EXTERNAL_MODULE__19dc__;
 
 /***/ }),
 
+/***/ "4a59":
+/***/ (function(module, exports, __webpack_require__) {
+
+// extracted by mini-css-extract-plugin
+
+/***/ }),
+
 /***/ "593a":
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -146,6 +153,17 @@ module.exports = __WEBPACK_EXTERNAL_MODULE__8bbf__;
 
 /***/ }),
 
+/***/ "8edd":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var _node_modules_vue_cli_service_node_modules_mini_css_extract_plugin_dist_loader_js_ref_11_oneOf_1_0_node_modules_vue_cli_service_node_modules_css_loader_dist_cjs_js_ref_11_oneOf_1_1_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_stylePostLoader_js_node_modules_postcss_loader_src_index_js_ref_11_oneOf_1_2_node_modules_less_loader_dist_cjs_js_ref_11_oneOf_1_3_node_modules_vue_cli_service_node_modules_cache_loader_dist_cjs_js_ref_1_0_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_index_js_ref_1_1_FieldAIConsent_vue_vue_type_style_index_0_id_9fe526a6_lang_less__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("4a59");
+/* harmony import */ var _node_modules_vue_cli_service_node_modules_mini_css_extract_plugin_dist_loader_js_ref_11_oneOf_1_0_node_modules_vue_cli_service_node_modules_css_loader_dist_cjs_js_ref_11_oneOf_1_1_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_stylePostLoader_js_node_modules_postcss_loader_src_index_js_ref_11_oneOf_1_2_node_modules_less_loader_dist_cjs_js_ref_11_oneOf_1_3_node_modules_vue_cli_service_node_modules_cache_loader_dist_cjs_js_ref_1_0_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_index_js_ref_1_1_FieldAIConsent_vue_vue_type_style_index_0_id_9fe526a6_lang_less__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_vue_cli_service_node_modules_mini_css_extract_plugin_dist_loader_js_ref_11_oneOf_1_0_node_modules_vue_cli_service_node_modules_css_loader_dist_cjs_js_ref_11_oneOf_1_1_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_stylePostLoader_js_node_modules_postcss_loader_src_index_js_ref_11_oneOf_1_2_node_modules_less_loader_dist_cjs_js_ref_11_oneOf_1_3_node_modules_vue_cli_service_node_modules_cache_loader_dist_cjs_js_ref_1_0_node_modules_vue_cli_service_node_modules_vue_loader_v16_dist_index_js_ref_1_1_FieldAIConsent_vue_vue_type_style_index_0_id_9fe526a6_lang_less__WEBPACK_IMPORTED_MODULE_0__);
+/* unused harmony reexport * */
+
+
+/***/ }),
+
 /***/ "a5a2":
 /***/ (function(module, exports) {
 
@@ -161,6 +179,7 @@ module.exports = __WEBPACK_EXTERNAL_MODULE_a5a2__;
 __webpack_require__.r(__webpack_exports__);
 
 // EXPORTS
+__webpack_require__.d(__webpack_exports__, "FieldAIConsent", function() { return /* reexport */ FieldAIConsent; });
 __webpack_require__.d(__webpack_exports__, "ManageAIProviders", function() { return /* reexport */ ManageAIProviders; });
 
 // CONCATENATED MODULE: ./node_modules/@vue/cli-service/lib/commands/build/setPublicPath.js
@@ -182,29 +201,127 @@ if (typeof window !== 'undefined') {
 // EXTERNAL MODULE: external {"commonjs":"vue","commonjs2":"vue","root":"Vue"}
 var external_commonjs_vue_commonjs2_vue_root_Vue_ = __webpack_require__("8bbf");
 
+// CONCATENATED MODULE: ./node_modules/@vue/cli-plugin-babel/node_modules/cache-loader/dist/cjs.js??ref--13-0!./node_modules/@vue/cli-plugin-babel/node_modules/thread-loader/dist/cjs.js!./node_modules/babel-loader/lib!./node_modules/@vue/cli-service/node_modules/vue-loader-v16/dist/templateLoader.js??ref--6!./node_modules/@vue/cli-service/node_modules/cache-loader/dist/cjs.js??ref--1-0!./node_modules/@vue/cli-service/node_modules/vue-loader-v16/dist??ref--1-1!./plugins/AIProviders/vue/src/components/FieldAIConsent.vue?vue&type=template&id=9fe526a6
+
+const _hoisted_1 = {
+  class: "fieldAIConsent"
+};
+const _hoisted_2 = {
+  class: "fieldAIConsent__tierHead"
+};
+const _hoisted_3 = {
+  class: "fieldAIConsent__tierLabel"
+};
+const _hoisted_4 = ["id", "name", "value", "checked", "disabled", "aria-describedby", "onChange"];
+const _hoisted_5 = {
+  key: 0,
+  class: "fieldAIConsent__tierBadge"
+};
+const _hoisted_6 = ["id"];
+function render(_ctx, _cache, $props, $setup, $data, $options) {
+  return Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("div", _hoisted_1, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withDirectives"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("label", {
+    class: "fieldAIConsent__title"
+  }, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(_ctx.title), 513), [[external_commonjs_vue_commonjs2_vue_root_Vue_["vShow"], _ctx.title]]), (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(true), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])(external_commonjs_vue_commonjs2_vue_root_Vue_["Fragment"], null, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["renderList"])(_ctx.tiers, (tier, index) => {
+    return Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("p", {
+      class: "fieldAIConsent__tier",
+      key: tier.key
+    }, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("span", _hoisted_2, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("label", _hoisted_3, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("input", {
+      type: "checkbox",
+      id: `${_ctx.id}${tier.key}`,
+      name: _ctx.name,
+      value: tier.key,
+      checked: index <= _ctx.selectedIndex,
+      disabled: index < _ctx.selectedIndex,
+      "aria-describedby": `${_ctx.id}${tier.key}Help`,
+      onChange: $event => _ctx.onToggle(index)
+    }, null, 40, _hoisted_4), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("span", {
+      class: Object(external_commonjs_vue_commonjs2_vue_root_Vue_["normalizeClass"])(["fieldAIConsent__tierName", {
+        'fieldAIConsent__tierName--included': index < _ctx.selectedIndex
+      }])
+    }, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(tier.value), 3)]), index < _ctx.selectedIndex ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("span", _hoisted_5, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(_ctx.translate('AIProviders_DataConsentIncluded')), 1)) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)]), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withDirectives"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("span", {
+      class: "fieldAIConsent__tierHelp",
+      id: `${_ctx.id}${tier.key}Help`
+    }, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(tier.description), 9, _hoisted_6), [[external_commonjs_vue_commonjs2_vue_root_Vue_["vShow"], tier.description]])]);
+  }), 128))]);
+}
+// CONCATENATED MODULE: ./plugins/AIProviders/vue/src/components/FieldAIConsent.vue?vue&type=template&id=9fe526a6
+
 // EXTERNAL MODULE: external "CoreHome"
 var external_CoreHome_ = __webpack_require__("19dc");
 
+// CONCATENATED MODULE: ./node_modules/@vue/cli-plugin-typescript/node_modules/cache-loader/dist/cjs.js??ref--15-0!./node_modules/babel-loader/lib!./node_modules/@vue/cli-plugin-typescript/node_modules/ts-loader??ref--15-2!./node_modules/@vue/cli-service/node_modules/cache-loader/dist/cjs.js??ref--1-0!./node_modules/@vue/cli-service/node_modules/vue-loader-v16/dist??ref--1-1!./plugins/AIProviders/vue/src/components/FieldAIConsent.vue?vue&type=script&lang=ts
+
+
+/** Mirrors AIDataScope::NONE. */
+const NO_CONSENT = 'none';
+/**
+ * Checklist for the AI data consent setting. The stored value is the highest
+ * ticked tier: ticking one ticks and disables the tiers below it, unticking the
+ * highest one steps down a tier.
+ */
+/* harmony default export */ var FieldAIConsentvue_type_script_lang_ts = (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["defineComponent"])({
+  props: {
+    modelValue: String,
+    title: String,
+    name: String,
+    id: String,
+    availableValues: Object
+  },
+  inheritAttrs: false,
+  emits: ['update:modelValue'],
+  computed: {
+    tiers() {
+      return Object.values(this.availableValues || {});
+    },
+    /** Highest ticked tier, -1 when nothing is consented to. */
+    selectedIndex() {
+      return this.tiers.findIndex(tier => tier.key === this.modelValue);
+    }
+  },
+  methods: {
+    translate: external_CoreHome_["translate"],
+    onToggle(index) {
+      var _this$tiers$key, _this$tiers;
+      // unticking the highest tier keeps the one below rather than revoking all
+      const newValue = index === this.selectedIndex ? (_this$tiers$key = (_this$tiers = this.tiers[index - 1]) === null || _this$tiers === void 0 ? void 0 : _this$tiers.key) !== null && _this$tiers$key !== void 0 ? _this$tiers$key : NO_CONSENT : this.tiers[index].key;
+      this.$emit('update:modelValue', newValue);
+    }
+  }
+}));
+// CONCATENATED MODULE: ./plugins/AIProviders/vue/src/components/FieldAIConsent.vue?vue&type=script&lang=ts
+ 
+// EXTERNAL MODULE: ./plugins/AIProviders/vue/src/components/FieldAIConsent.vue?vue&type=style&index=0&id=9fe526a6&lang=less
+var FieldAIConsentvue_type_style_index_0_id_9fe526a6_lang_less = __webpack_require__("8edd");
+
+// CONCATENATED MODULE: ./plugins/AIProviders/vue/src/components/FieldAIConsent.vue
+
+
+
+
+
+FieldAIConsentvue_type_script_lang_ts.render = render
+
+/* harmony default export */ var FieldAIConsent = (FieldAIConsentvue_type_script_lang_ts);
 // EXTERNAL MODULE: external "CorePluginsAdmin"
 var external_CorePluginsAdmin_ = __webpack_require__("a5a2");
 
 // CONCATENATED MODULE: ./node_modules/@vue/cli-plugin-typescript/node_modules/cache-loader/dist/cjs.js??ref--15-0!./node_modules/babel-loader/lib!./node_modules/@vue/cli-plugin-typescript/node_modules/ts-loader??ref--15-2!./node_modules/@vue/cli-service/node_modules/cache-loader/dist/cjs.js??ref--1-0!./node_modules/@vue/cli-service/node_modules/vue-loader-v16/dist??ref--1-1!./plugins/AIProviders/vue/src/components/ProviderCard.vue?vue&type=script&setup=true&lang=ts
 
 
-const _hoisted_1 = ["aria-checked", "aria-disabled", "tabindex"];
-const _hoisted_2 = {
+const ProviderCardvue_type_script_setup_true_lang_ts_hoisted_1 = ["aria-checked", "aria-disabled", "tabindex"];
+const ProviderCardvue_type_script_setup_true_lang_ts_hoisted_2 = {
   class: "ai-providers-card-inner"
 };
-const _hoisted_3 = {
+const ProviderCardvue_type_script_setup_true_lang_ts_hoisted_3 = {
   class: "ai-providers-card-heading"
 };
-const _hoisted_4 = {
+const ProviderCardvue_type_script_setup_true_lang_ts_hoisted_4 = {
   class: "ai-providers-card-header"
 };
-const _hoisted_5 = {
+const ProviderCardvue_type_script_setup_true_lang_ts_hoisted_5 = {
   class: "ai-providers-card-name"
 };
-const _hoisted_6 = {
+const ProviderCardvue_type_script_setup_true_lang_ts_hoisted_6 = {
   key: 0,
   class: "ai-providers-card-default"
 };
@@ -303,7 +420,7 @@ const _hoisted_14 = ["disabled"];
         tabindex: __props.usableAsDefault ? 0 : -1,
         onClick: _cache[7] || (_cache[7] = $event => selectProvider()),
         onKeydown: [_cache[8] || (_cache[8] = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withKeys"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withModifiers"])($event => selectProvider(), ["prevent"]), ["enter"])), _cache[9] || (_cache[9] = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withKeys"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withModifiers"])($event => selectProvider(), ["prevent"]), ["space"]))]
-      }, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", _hoisted_2, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", _hoisted_3, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", _hoisted_4, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("span", _hoisted_5, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(__props.provider.name), 1), __props.selected ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("span", _hoisted_6, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_DefaultBadge')), 1)) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)]), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("p", _hoisted_7, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])(__props.provider.description)), 1)]), __props.canEdit ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])(external_commonjs_vue_commonjs2_vue_root_Vue_["Fragment"], {
+      }, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", ProviderCardvue_type_script_setup_true_lang_ts_hoisted_2, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", ProviderCardvue_type_script_setup_true_lang_ts_hoisted_3, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("div", ProviderCardvue_type_script_setup_true_lang_ts_hoisted_4, [Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("span", ProviderCardvue_type_script_setup_true_lang_ts_hoisted_5, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(__props.provider.name), 1), __props.selected ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])("span", ProviderCardvue_type_script_setup_true_lang_ts_hoisted_6, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_DefaultBadge')), 1)) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)]), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementVNode"])("p", _hoisted_7, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])(__props.provider.description)), 1)]), __props.canEdit ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createElementBlock"])(external_commonjs_vue_commonjs2_vue_root_Vue_["Fragment"], {
         key: 0
       }, [__props.provider.supportsCustomEndpoint ? (Object(external_commonjs_vue_commonjs2_vue_root_Vue_["openBlock"])(), Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createBlock"])(Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CorePluginsAdmin_["Field"]), {
         key: 0,
@@ -367,7 +484,7 @@ const _hoisted_14 = ["disabled"];
         type: "button",
         disabled: __props.isDisconnecting || !__props.provider.configuration.hasApiKey,
         onClick: _cache[6] || (_cache[6] = Object(external_commonjs_vue_commonjs2_vue_root_Vue_["withModifiers"])($event => emit('disconnect'), ["prevent", "stop"]))
-      }, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(__props.isDisconnecting ? Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_Disconnecting') : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_Disconnect')), 9, _hoisted_14)])], 64)) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)])], 42, _hoisted_1);
+      }, Object(external_commonjs_vue_commonjs2_vue_root_Vue_["toDisplayString"])(__props.isDisconnecting ? Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_Disconnecting') : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["unref"])(external_CoreHome_["translate"])('AIProviders_Disconnect')), 9, _hoisted_14)])], 64)) : Object(external_commonjs_vue_commonjs2_vue_root_Vue_["createCommentVNode"])("", true)])], 42, ProviderCardvue_type_script_setup_true_lang_ts_hoisted_1);
     };
   }
 }));
@@ -798,6 +915,7 @@ var ManageAIProvidersvue_type_style_index_0_id_45925331_lang_less = __webpack_re
  * @link    https://matomo.org
  * @license https://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
+
 
 // CONCATENATED MODULE: ./node_modules/@vue/cli-service/lib/commands/build/entry-lib-no-default.js
 

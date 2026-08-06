@@ -42,13 +42,22 @@ class AIProviderService
      */
     private $configuration;
 
-    public function __construct(Configuration $configuration)
+    /**
+     * @var SystemSettings
+     */
+    private $systemSettings;
+
+    public function __construct(Configuration $configuration, SystemSettings $systemSettings)
     {
         $this->configuration = $configuration;
+        $this->systemSettings = $systemSettings;
     }
 
     /**
      * Completes the given request.
+     *
+     * Consent is the caller's job: this service cannot see what a prompt
+     * contains, so check {@link hasConsentFor()} before building a request.
      *
      * The provider is resolved in this order: the provider forced by a managed
      * environment, then the provider requested by
@@ -119,6 +128,8 @@ class AIProviderService
      *
      * Unlike {@link complete()}, an empty text response is valid here: a turn
      * may consist solely of tool_use blocks.
+     *
+     * Consent is the caller's responsibility, as in {@link complete()}.
      */
     public function converse(AIConversationRequest $request): AIConversationResponse
     {
@@ -148,6 +159,18 @@ class AIProviderService
         // TODO: publish the same `AIProviders.usage` observability event as
         // planned for complete() once it is implemented there.
         return $provider->converse($request, $configuration);
+    }
+
+    /**
+     * Returns whether a super user consented to sending the given
+     * {@link AIDataScope} to an AI provider.
+     *
+     * Features call this for the widest scope they send and hide themselves when
+     * it is false. Needs no access rights, so it also works for UI gating.
+     */
+    public function hasConsentFor(string $dataScope): bool
+    {
+        return AIDataScope::covers($this->systemSettings->getDataConsent(), $dataScope);
     }
 
     /**

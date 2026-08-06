@@ -5,4 +5,5 @@
  * @license https://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
 
+export { default as FieldAIConsent } from './components/FieldAIConsent.vue';
 export { default as ManageAIProviders } from './ManageAIProviders.vue';
