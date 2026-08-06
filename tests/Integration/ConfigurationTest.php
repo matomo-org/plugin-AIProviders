@@ -14,6 +14,7 @@ namespace Piwik\Plugins\AIProviders\tests\Integration;
 use Piwik\Config;
 use Piwik\Container\StaticContainer;
 use Piwik\Piwik;
+use Piwik\Plugin\Manager;
 use Piwik\Plugins\AIProviders\AIProvidersList;
 use Piwik\Plugins\AIProviders\AIRequest;
 use Piwik\Plugins\AIProviders\API;
@@ -21,6 +22,9 @@ use Piwik\Plugins\AIProviders\AIProviderService;
 use Piwik\Plugins\AIProviders\Controller;
 use Piwik\Plugins\AIProviders\Exception\AIProviderClientException;
 use Piwik\Plugins\AIProviders\Model\Configuration;
+use Piwik\Plugins\AIProviders\Provider\Anthropic;
+use Piwik\Plugins\AIProviders\Provider\Bedrock;
+use Piwik\Plugins\AIProviders\Provider\CustomProvider;
 use Piwik\Plugins\AIProviders\Provider\OpenAI;
 use Piwik\Tests\Framework\Fixture;
 use Piwik\Tests\Framework\Mock\FakeAccess;
@@ -47,6 +51,11 @@ class ConfigurationTest extends IntegrationTestCase
 
         Fixture::createSuperUser();
         $this->setSuperUser();
+
+        // IntegrationTestCase resets the translator, so the plugin lang
+        // directories FrontController/Console register are gone. Validation
+        // errors are translated, so bring them back.
+        Manager::getInstance()->loadPluginTranslations();
 
         $this->api = API::getInstance();
 
@@ -149,7 +158,7 @@ class ConfigurationTest extends IntegrationTestCase
         $claude = $this->getProvider($settings, 'anthropic');
         $this->assertTrue($claude['configuration']['hasApiKey']);
 
-        $stored = StaticContainer::get(Configuration::class)->getProviderConfiguration('anthropic');
+        $stored = StaticContainer::get(Configuration::class)->getProviderConfiguration(new Anthropic());
         $this->assertSame($apiKey, $stored['apiKey']);
     }
 
@@ -201,7 +210,7 @@ class ConfigurationTest extends IntegrationTestCase
         // The stored credentials stay internal to the plugin; the service does
         // not expose them. They are only resolvable through the Configuration.
         $configuration = StaticContainer::get(Configuration::class);
-        $this->assertSame('secret-claude-key', $configuration->getProviderConfiguration('anthropic')['apiKey']);
+        $this->assertSame('secret-claude-key', $configuration->getProviderConfiguration(new Anthropic())['apiKey']);
         $this->assertFalse(method_exists($service, 'getDefaultProviderConfiguration'));
     }
 
@@ -530,7 +539,7 @@ class ConfigurationTest extends IntegrationTestCase
 
         $configuration = StaticContainer::get(Configuration::class);
 
-        $this->assertSame('config-openai-key', $configuration->getProviderConfiguration('openai')['apiKey']);
+        $this->assertSame('config-openai-key', $configuration->getProviderConfiguration(new OpenAI())['apiKey']);
     }
 
     public function testEnvironmentVariableSuppliesApiKey(): void
@@ -539,12 +548,12 @@ class ConfigurationTest extends IntegrationTestCase
 
         $configuration = StaticContainer::get(Configuration::class);
 
-        $this->assertSame('env-openai-key', $configuration->getProviderConfiguration('openai')['apiKey']);
+        $this->assertSame('env-openai-key', $configuration->getProviderConfiguration(new OpenAI())['apiKey']);
 
         // The config file wins over the environment variable.
         Config::getInstance()->AIProviders = ['openaiApiKey' => 'config-openai-key'];
 
-        $this->assertSame('config-openai-key', $configuration->getProviderConfiguration('openai')['apiKey']);
+        $this->assertSame('config-openai-key', $configuration->getProviderConfiguration(new OpenAI())['apiKey']);
     }
 
     public function testDiValueSuppliesApiKey(): void
@@ -553,7 +562,7 @@ class ConfigurationTest extends IntegrationTestCase
 
         $configuration = StaticContainer::get(Configuration::class);
 
-        $this->assertSame('di-openai-key', $configuration->getProviderConfiguration('openai')['apiKey']);
+        $this->assertSame('di-openai-key', $configuration->getProviderConfiguration(new OpenAI())['apiKey']);
     }
 
     public function testDiValueWinsOverConfigFileAndEnvironmentVariable(): void
@@ -564,7 +573,7 @@ class ConfigurationTest extends IntegrationTestCase
 
         $configuration = StaticContainer::get(Configuration::class);
 
-        $this->assertSame('di-openai-key', $configuration->getProviderConfiguration('openai')['apiKey']);
+        $this->assertSame('di-openai-key', $configuration->getProviderConfiguration(new OpenAI())['apiKey']);
     }
 
     public function testManagedFlowServesAllowlistedPluginThroughRestrictedProviderWithConfigCredentials(): void
@@ -689,7 +698,7 @@ class ConfigurationTest extends IntegrationTestCase
             ])
         );
 
-        $stored = StaticContainer::get(Configuration::class)->getProviderConfiguration('bedrock');
+        $stored = StaticContainer::get(Configuration::class)->getProviderConfiguration(new Bedrock());
 
         $this->assertSame('eu-central-1', $stored['endpointUrl']);
         $this->assertTrue($stored['useFipsEndpoint']);
@@ -707,13 +716,17 @@ class ConfigurationTest extends IntegrationTestCase
             ])
         );
 
-        $stored = StaticContainer::get(Configuration::class)->getProviderConfiguration('bedrock');
+        $stored = StaticContainer::get(Configuration::class)->getProviderConfiguration(new Bedrock());
 
         $this->assertTrue($stored['useFipsEndpoint']);
     }
 
     public function testSavingBedrockWithAnUnrecognizedRegionValueStillFails(): void
     {
+        // Bedrock rejects the value while normalizing it, and names the region
+        // rather than a URL because that is what its field holds. The provider's
+        // own English wording is asserted by
+        // BedrockConverseTest::testFullUrlEndpointIsRejectedBeforeTheBearerTokenCanBeSent().
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('The AWS region for AWS Bedrock is invalid.');
 
@@ -722,6 +735,23 @@ class ConfigurationTest extends IntegrationTestCase
             '',
             (string) json_encode([
                 'bedrock' => ['apiKey' => 'bedrock-long-term-key', 'endpointUrl' => 'not a url'],
+            ])
+        );
+    }
+
+    public function testSavingAnEndpointUrlThatIsNotAUrlFails(): void
+    {
+        // The sibling of the Bedrock case above: a provider whose field is a URL
+        // gets there through URL validation instead of normalization, and both
+        // paths report the wording the provider asked for.
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('The endpoint URL for Custom Provider is invalid.');
+
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'custom-provider' => ['endpointUrl' => 'ftp://elsewhere.example.test/v1'],
             ])
         );
     }
@@ -859,6 +889,533 @@ class ConfigurationTest extends IntegrationTestCase
 
         $this->assertSame('openai', $response['providerId']);
         $this->assertSame('OpenAI', $response['providerName']);
+    }
+
+    public function testConnectionTestWithADifferentEndpointUrlIsRejectedWhileAManagedApiKeyPinsIt(): void
+    {
+        $this->useManagedCustomProviderCredentials();
+
+        $capturedUrl = null;
+        $capturedHeaders = null;
+        $this->mockModelListingResponse($capturedUrl, $capturedHeaders);
+
+        // Omitting the API key keeps the managed one, so the submitted endpoint
+        // must not be honoured.
+        try {
+            $this->api->testConnection(
+                'custom-provider',
+                (string) json_encode(['endpointUrl' => 'https://elsewhere.example.test/v1'])
+            );
+            $this->fail('Expected the differing endpoint URL to be rejected.');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString(
+                'The endpoint for Custom Provider is set in the Matomo server configuration',
+                $e->getMessage()
+            );
+        }
+
+        $this->assertNull($capturedUrl);
+        $this->assertNull($capturedHeaders);
+    }
+
+    public function testConnectionTestWithADifferentEndpointUrlIsRejectedWhileOneIsSuppliedCentrally(): void
+    {
+        // No managed API key here: the endpoint alone is enough to decide it, and
+        // a test that probed the submitted host would report a pairing the save
+        // path refuses to store.
+        Config::getInstance()->AIProviders = [
+            'custom-providerEndpointUrl' => 'https://central.example.test/v1',
+        ];
+
+        $capturedUrl = null;
+        $capturedHeaders = null;
+        $this->mockModelListingResponse($capturedUrl, $capturedHeaders);
+
+        try {
+            $this->api->testConnection(
+                'custom-provider',
+                (string) json_encode([
+                    'apiKey' => 'own-custom-key',
+                    'endpointUrl' => 'https://elsewhere.example.test/v1',
+                ])
+            );
+            $this->fail('Expected the differing endpoint URL to be rejected.');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString(
+                'The endpoint for Custom Provider is set in the Matomo server configuration',
+                $e->getMessage()
+            );
+        }
+
+        $this->assertNull($capturedUrl);
+        $this->assertNull($capturedHeaders);
+    }
+
+    public function testConnectionTestWithAnEndpointUrlIsRejectedWhenTheManagedApiKeyHasNone(): void
+    {
+        // The case the admin actually hits first: no endpoint was supplied
+        // alongside the key, so the empty field invites typing one.
+        Config::getInstance()->AIProviders = ['custom-providerApiKey' => 'managed-custom-key'];
+
+        $capturedUrl = null;
+        $capturedHeaders = null;
+        $this->mockModelListingResponse($capturedUrl, $capturedHeaders);
+
+        try {
+            $this->api->testConnection(
+                'custom-provider',
+                (string) json_encode(['endpointUrl' => 'https://elsewhere.example.test/v1'])
+            );
+            $this->fail('Expected the endpoint URL to be rejected.');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString(
+                'The API key for Custom Provider is set in the Matomo server configuration',
+                $e->getMessage()
+            );
+        }
+
+        $this->assertNull($capturedUrl);
+        $this->assertNull($capturedHeaders);
+    }
+
+    public function testManagedApiKeyIsSentToTheManagedEndpointUrl(): void
+    {
+        $this->useManagedCustomProviderCredentials();
+
+        $capturedUrl = null;
+        $capturedHeaders = null;
+        $this->mockModelListingResponse($capturedUrl, $capturedHeaders);
+
+        // The connection test the UI performs: the form prefills the effective
+        // endpoint and always submits an empty API key.
+        $response = $this->api->testConnection(
+            'custom-provider',
+            (string) json_encode(['apiKey' => '', 'endpointUrl' => 'https://managed.example.test/v1'])
+        );
+
+        $this->assertSame(['model-a'], $response['models']);
+        $this->assertSame('https://managed.example.test/v1/models', $capturedUrl);
+        $this->assertContains('Authorization: Bearer managed-custom-key', $capturedHeaders);
+    }
+
+    public function testASubmittedApiKeyStillMayNotTestADifferentEndpointUrl(): void
+    {
+        $this->useManagedCustomProviderCredentials();
+
+        $capturedUrl = null;
+        $capturedHeaders = null;
+        $this->mockModelListingResponse($capturedUrl, $capturedHeaders);
+
+        // A save could never store that pair, so a passing test would report a
+        // configuration that cannot exist. Refused before the request is sent.
+        try {
+            $this->api->testConnection(
+                'custom-provider',
+                (string) json_encode([
+                    'apiKey' => 'own-custom-key',
+                    'endpointUrl' => 'https://elsewhere.example.test/v1',
+                ])
+            );
+            $this->fail('Expected the differing endpoint URL to be rejected.');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString(
+                'The endpoint for Custom Provider is set in the Matomo server configuration',
+                $e->getMessage()
+            );
+        }
+
+        $this->assertNull($capturedUrl);
+        $this->assertNull($capturedHeaders);
+    }
+
+    public function testASubmittedApiKeyMayBeTestedAgainstThePinnedEndpointUrl(): void
+    {
+        $this->useManagedCustomProviderCredentials();
+
+        $capturedUrl = null;
+        $capturedHeaders = null;
+        $this->mockModelListingResponse($capturedUrl, $capturedHeaders);
+
+        // Only the endpoint is pinned, not the key, and it is the submitted key
+        // that is sent rather than the managed one.
+        $this->api->testConnection(
+            'custom-provider',
+            (string) json_encode([
+                'apiKey' => 'own-custom-key',
+                'endpointUrl' => 'https://managed.example.test/v1',
+            ])
+        );
+
+        $this->assertSame('https://managed.example.test/v1/models', $capturedUrl);
+        $this->assertContains('Authorization: Bearer own-custom-key', $capturedHeaders);
+        $this->assertStringNotContainsString('managed-custom-key', implode("\n", $capturedHeaders));
+    }
+
+    public function testManagedApiKeyIgnoresAStoredEndpointUrl(): void
+    {
+        // Stored while the instance still resolves its own endpoint …
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'custom-provider' => ['endpointUrl' => 'https://elsewhere.example.test/v1'],
+            ])
+        );
+
+        // … and then the host supplies the API key without an endpoint.
+        Config::getInstance()->AIProviders = ['custom-providerApiKey' => 'managed-custom-key'];
+
+        $configuration = StaticContainer::get(Configuration::class)->getProviderConfiguration(
+            new CustomProvider()
+        );
+
+        // The key is not paired with the stored endpoint, so the provider has no
+        // destination and reports as unusable.
+        $this->assertSame('managed-custom-key', $configuration['apiKey']);
+        $this->assertSame('', $configuration['endpointUrl']);
+        $this->assertFalse((new CustomProvider())->isConfigured($configuration));
+    }
+
+    public function testManagedApiKeyKeepsTheBedrockRegionEditable(): void
+    {
+        // Bedrock's endpoint field is a region that only ever expands to an AWS
+        // host, so a managed API key must not pin it.
+        Config::getInstance()->AIProviders = ['bedrockApiKey' => 'managed-bedrock-key'];
+
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode(['bedrock' => ['endpointUrl' => 'eu-central-1']])
+        );
+
+        $configuration = StaticContainer::get(Configuration::class)->getProviderConfiguration(new Bedrock());
+
+        $this->assertSame('managed-bedrock-key', $configuration['apiKey']);
+        $this->assertSame('eu-central-1', $configuration['endpointUrl']);
+    }
+
+    public function testSavingADifferentEndpointUrlIsRejectedWhileAManagedApiKeyPinsIt(): void
+    {
+        $this->useManagedCustomProviderCredentials();
+
+        // Storing it would be silently undone on read, so say so instead. The
+        // endpoint is supplied here too, so the message points at the value in
+        // place rather than telling the admin to add one.
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'The endpoint for Custom Provider is set in the Matomo server configuration, as '
+            . '"custom-providerEndpointUrl" in the [AIProviders] section. '
+            . 'It cannot be changed on this page.'
+        );
+
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'custom-provider' => ['endpointUrl' => 'https://elsewhere.example.test/v1'],
+            ])
+        );
+    }
+
+    public function testSavingAnEndpointUrlIsRejectedWhenTheManagedApiKeyHasNone(): void
+    {
+        // The case the admin actually hits: the provider is unusable because no
+        // endpoint was supplied alongside the key, and typing one cannot fix it.
+        Config::getInstance()->AIProviders = ['custom-providerApiKey' => 'managed-custom-key'];
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('The API key for Custom Provider is set in the Matomo server configuration');
+
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'custom-provider' => ['endpointUrl' => 'https://elsewhere.example.test/v1'],
+            ])
+        );
+    }
+
+    public function testResubmittingThePinnedEndpointUrlUnchangedIsAccepted(): void
+    {
+        $this->useManagedCustomProviderCredentials();
+
+        // What the admin form sends on every save: the endpoint field is
+        // prefilled with the effective value and posted back untouched.
+        $settings = $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'custom-provider' => ['endpointUrl' => 'https://managed.example.test/v1'],
+            ])
+        );
+
+        $this->assertSame(
+            'https://managed.example.test/v1',
+            $this->getProvider($settings, 'custom-provider')['configuration']['endpointUrl']
+        );
+    }
+
+    public function testSavingKeepsTheSelectedModelWhileAManagedApiKeyPinsTheEndpointUrl(): void
+    {
+        $this->useManagedCustomProviderCredentials();
+
+        // The key and the endpoint are both kept out of the database, so the
+        // stored entry has to survive on the model alone.
+        $settings = $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'custom-provider' => [
+                    'apiKey' => '',
+                    'endpointUrl' => 'https://managed.example.test/v1',
+                    'model' => 'model-a',
+                ],
+            ])
+        );
+
+        $this->assertSame(
+            'model-a',
+            $this->getProvider($settings, 'custom-provider')['configuration']['model']
+        );
+
+        $configuration = StaticContainer::get(Configuration::class)->getProviderConfiguration(
+            new CustomProvider()
+        );
+
+        $this->assertSame('model-a', $configuration['model']);
+        $this->assertSame('managed-custom-key', $configuration['apiKey']);
+        $this->assertSame('https://managed.example.test/v1', $configuration['endpointUrl']);
+    }
+
+    public function testSavingKeepsAStoredEndpointUrlWhileAManagedApiKeyPinsIt(): void
+    {
+        // Configured while the instance still resolved its own endpoint …
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'custom-provider' => ['endpointUrl' => 'https://instance.example.test/v1'],
+            ])
+        );
+
+        // … and then the host supplies the API key without an endpoint, which
+        // hides the stored one: getSettings() reports the effective (empty)
+        // value, so the admin form posts that back on the next save.
+        Config::getInstance()->AIProviders = ['custom-providerApiKey' => 'managed-custom-key'];
+
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode(['custom-provider' => ['endpointUrl' => '']])
+        );
+
+        // Removing the supplied key unpins the endpoint again, and the
+        // instance's own endpoint must not have been erased in the meantime.
+        Config::getInstance()->AIProviders = [];
+
+        $configuration = StaticContainer::get(Configuration::class)->getProviderConfiguration(
+            new CustomProvider()
+        );
+
+        $this->assertSame('https://instance.example.test/v1', $configuration['endpointUrl']);
+    }
+
+    public function testSavingWithTheEndpointUrlOmittedKeepsTheStoredOneWhileAManagedApiKeyPinsIt(): void
+    {
+        // Configured while the instance still resolved its own endpoint …
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'custom-provider' => ['endpointUrl' => 'https://instance.example.test/v1'],
+            ])
+        );
+
+        // … and then the host supplies the API key, which pins the endpoint.
+        $this->useManagedCustomProviderCredentials();
+
+        // A payload that leaves the pinned provider out entirely must not be
+        // read as clearing its stored endpoint. The test above covers the same
+        // guarantee for an explicitly submitted empty value.
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode(['openai' => ['apiKey' => 'secret-openai-key']])
+        );
+
+        // Removing the supplied key unpins the endpoint again, and the
+        // instance's own endpoint must not have been dropped in the meantime.
+        Config::getInstance()->AIProviders = [];
+
+        $configuration = StaticContainer::get(Configuration::class)->getProviderConfiguration(
+            new CustomProvider()
+        );
+
+        $this->assertSame('https://instance.example.test/v1', $configuration['endpointUrl']);
+    }
+
+    public function testSavingDoesNotCopyManagedCredentialsIntoTheDatabase(): void
+    {
+        $this->useManagedCustomProviderCredentials();
+
+        // The form resubmits the prefilled managed endpoint and an empty API key
+        // (see testResubmittingThePinnedEndpointUrlUnchangedIsAccepted()).
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'custom-provider' => [
+                    'apiKey' => '',
+                    'endpointUrl' => 'https://managed.example.test/v1',
+                ],
+            ])
+        );
+
+        // With the managed credentials gone the database is all that is left,
+        // and it must not have picked either of them up along the way.
+        Config::getInstance()->AIProviders = [];
+
+        $configuration = StaticContainer::get(Configuration::class)->getProviderConfiguration(
+            new CustomProvider()
+        );
+
+        $this->assertSame('', $configuration['apiKey']);
+        $this->assertSame('', $configuration['endpointUrl']);
+    }
+
+    public function testSavingAnotherProviderIsUnaffectedByAPinnedEndpointUrl(): void
+    {
+        $this->useManagedCustomProviderCredentials();
+
+        // A pinned provider must not make the whole save fail: a payload that
+        // only mentions another provider still stores that provider's key.
+        $settings = $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode(['openai' => ['apiKey' => 'secret-openai-key']])
+        );
+
+        $this->assertTrue($this->getProvider($settings, 'openai')['configuration']['hasApiKey']);
+    }
+
+    public function testSavingADifferentEndpointUrlIsRejectedWhileOneIsSuppliedCentrally(): void
+    {
+        // Nothing is pinned here — pinning is what a supplied *key* does — but the
+        // endpoint is decided centrally all the same, so it is refused on the same
+        // terms rather than being accepted and quietly dropped.
+        Config::getInstance()->AIProviders = [
+            'custom-providerEndpointUrl' => 'https://central.example.test/v1',
+        ];
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'The endpoint for Custom Provider is set in the Matomo server configuration, as '
+            . '"custom-providerEndpointUrl" in the [AIProviders] section. '
+            . 'It cannot be changed on this page.'
+        );
+
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'custom-provider' => ['endpointUrl' => 'https://elsewhere.example.test/v1'],
+            ])
+        );
+    }
+
+    public function testSavingResubmittingACentrallySuppliedEndpointUrlStoresTheOtherFields(): void
+    {
+        // Configured while the instance still resolved its own endpoint …
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'custom-provider' => ['endpointUrl' => 'https://instance.example.test/v1'],
+            ])
+        );
+
+        // … and then the host supplies the endpoint alone, without an API key.
+        Config::getInstance()->AIProviders = [
+            'custom-providerEndpointUrl' => 'https://central.example.test/v1',
+        ];
+
+        // What the form sends: the prefilled supplied endpoint, plus a key of the
+        // instance's own.
+        $settings = $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'custom-provider' => [
+                    'apiKey' => 'own-custom-key',
+                    'endpointUrl' => 'https://central.example.test/v1',
+                ],
+            ])
+        );
+
+        $customProvider = $this->getProvider($settings, 'custom-provider');
+
+        $this->assertSame('https://central.example.test/v1', $customProvider['configuration']['endpointUrl']);
+
+        // Only the endpoint is off limits: the API key is not supplied centrally,
+        // so that half of the same save did take effect.
+        $this->assertTrue($customProvider['configuration']['hasApiKey']);
+
+        // With the supplied endpoint gone the database decides again, and it still
+        // holds the endpoint from before: the supplied one was never copied in.
+        Config::getInstance()->AIProviders = [];
+
+        $configuration = StaticContainer::get(Configuration::class)->getProviderConfiguration(
+            new CustomProvider()
+        );
+
+        $this->assertSame('https://instance.example.test/v1', $configuration['endpointUrl']);
+        $this->assertSame('own-custom-key', $configuration['apiKey']);
+    }
+
+    public function testSavingADifferentBedrockRegionIsRejectedWhileOneIsSuppliedCentrally(): void
+    {
+        // A supplied API key leaves Bedrock's region editable (see
+        // testManagedApiKeyKeepsTheBedrockRegionEditable()), but a supplied region
+        // is still the region: the database has no say in it either way.
+        Config::getInstance()->AIProviders = ['bedrockEndpointUrl' => 'eu-central-1'];
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'The endpoint for AWS Bedrock is set in the Matomo server configuration, as '
+            . '"bedrockEndpointUrl" in the [AIProviders] section. '
+            . 'It cannot be changed on this page.'
+        );
+
+        $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode(['bedrock' => ['endpointUrl' => 'us-west-2']])
+        );
+    }
+
+    public function testSavingIsUnaffectedByAnEndpointUrlSuppliedForAFixedHostedProvider(): void
+    {
+        // OpenAI has no endpoint field, so a value supplied for it stays ignored
+        // (see the README) and must not lock the settings form: a submitted
+        // endpoint resolves to an empty string for such a provider, which would
+        // otherwise differ from the supplied one and fail every save.
+        Config::getInstance()->AIProviders = ['openaiEndpointUrl' => 'https://central.example.test/v1'];
+
+        $settings = $this->api->saveSettings(
+            '',
+            '',
+            (string) json_encode([
+                'openai' => [
+                    'apiKey' => 'secret-openai-key',
+                    'endpointUrl' => 'https://elsewhere.example.test/v1',
+                ],
+            ])
+        );
+
+        $openai = $this->getProvider($settings, 'openai');
+
+        $this->assertTrue($openai['configuration']['hasApiKey']);
+        $this->assertSame('', $openai['configuration']['endpointUrl']);
     }
 
     /**
@@ -1013,7 +1570,7 @@ class ConfigurationTest extends IntegrationTestCase
     public function testSaveSettingsRejectsUnconfiguredDefaultProvider(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('AI provider "openai" is not configured.');
+        $this->expectExceptionMessage('AI provider "OpenAI" is not configured.');
 
         $this->api->saveSettings(
             'openai',
@@ -1101,6 +1658,45 @@ class ConfigurationTest extends IntegrationTestCase
                 }
             }
         );
+    }
+
+    /**
+     * Supplies the custom provider's credentials the way a managed environment
+     * does, as a config-file API key together with the endpoint it belongs to.
+     */
+    private function useManagedCustomProviderCredentials(): void
+    {
+        Config::getInstance()->AIProviders = [
+            'custom-providerApiKey' => 'managed-custom-key',
+            'custom-providerEndpointUrl' => 'https://managed.example.test/v1',
+        ];
+    }
+
+    /**
+     * Answers the OpenAI-compatible `GET {base}/models` probe.
+     *
+     * @param string|null $capturedUrl Set to the requested URL.
+     * @param array<int, string>|null $capturedHeaders Set to the sent request headers.
+     */
+    private function mockModelListingResponse(?string &$capturedUrl, ?array &$capturedHeaders): void
+    {
+        Piwik::addAction('Http.sendHttpRequest', function (
+            string $url,
+            array $httpEventParams,
+            ?string &$response,
+            ?int &$status,
+            array &$headers
+        ) use (
+            &$capturedUrl,
+            &$capturedHeaders
+        ): void {
+            $capturedUrl = $url;
+            $capturedHeaders = $httpEventParams['headers'];
+
+            $response = (string) json_encode(['data' => [['id' => 'model-a']]]);
+            $status = 200;
+            $headers = ['Content-Type' => 'application/json'];
+        });
     }
 
     /**

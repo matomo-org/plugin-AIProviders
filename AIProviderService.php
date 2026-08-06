@@ -82,7 +82,7 @@ class AIProviderService
         }
 
         $provider = $this->requireProvider($providers, $resolution['providerId']);
-        $configuration = $this->configuration->getProviderConfiguration($provider->getId());
+        $configuration = $this->configuration->getProviderConfiguration($provider);
 
         $response = $this->runWithProvider($provider, $configuration, $request);
 
@@ -143,7 +143,7 @@ class AIProviderService
             ));
         }
 
-        $configuration = $this->configuration->getProviderConfiguration($provider->getId());
+        $configuration = $this->configuration->getProviderConfiguration($provider);
 
         // TODO: publish the same `AIProviders.usage` observability event as
         // planned for complete() once it is implemented there.
@@ -196,7 +196,7 @@ class AIProviderService
             return ['status' => self::CONVERSATION_PROVIDER_UNSUPPORTED] + $base;
         }
 
-        if (!$provider->isConfigured($this->configuration->getProviderConfiguration($provider->getId()))) {
+        if (!$provider->isConfigured($this->configuration->getProviderConfiguration($provider))) {
             return ['status' => self::CONVERSATION_NOT_CONFIGURED] + $base;
         }
 
@@ -264,6 +264,8 @@ class AIProviderService
         $provider = $providers->getProvider($providerId);
 
         if ($provider === null) {
+            // Untranslated on purpose: only a plugin passing its own provider ID
+            // reaches this, never the settings form.
             throw new InvalidArgumentException(sprintf('Unknown AI provider "%s".', $providerId));
         }
 
@@ -361,7 +363,7 @@ class AIProviderService
             ?? $this->configuration->getDefaultProviderId($providers);
 
         return array_map(function (AIProvider $provider) use ($defaultProviderId): array {
-            $configuration = $this->configuration->getProviderConfiguration($provider->getId());
+            $configuration = $this->configuration->getProviderConfiguration($provider);
 
             return [
                 'id' => $provider->getId(),
@@ -404,7 +406,7 @@ class AIProviderService
                 'id' => $provider->getId(),
                 'name' => $provider->getName(),
                 'isConfigured' => $provider->isConfigured(
-                    $this->configuration->getProviderConfiguration($provider->getId())
+                    $this->configuration->getProviderConfiguration($provider)
                 ),
             ];
         }, $usableProviders);
